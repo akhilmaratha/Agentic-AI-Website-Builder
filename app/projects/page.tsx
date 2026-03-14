@@ -101,7 +101,7 @@ export default function ProjectsPage() {
                 <button className="flex-1 flex justify-center items-center gap-2 py-2 border border-slate-700 hover:border-slate-500 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all">
                   <Eye className="w-3.5 h-3.5" /> Preview
                 </button>
-                <Link href={`/builder?id=${p._id}`} className="flex-1 flex justify-center items-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 rounded-lg text-xs font-bold transition-all">
+                <Link href={`/builder?projectId=${p._id}`} className="flex-1 flex justify-center items-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 rounded-lg text-xs font-bold transition-all">
                   <Edit2 className="w-3.5 h-3.5" /> Edit
                 </Link>
                 <button className="p-2 border border-slate-700 hover:border-red-500/50 hover:text-red-400 rounded-lg text-slate-400 transition-all ml-auto" title="Delete">

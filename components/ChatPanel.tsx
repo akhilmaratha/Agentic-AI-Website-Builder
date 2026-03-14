@@ -22,7 +22,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
     messages, addMessage, updateLastMessage,
     isGenerating, setIsGenerating,
     updateFiles, updatePreview, addLog,
-    activeFile, files,
+    activeFile, files, projectId,
   } = useBuilderStore();
 
   const { data: session } = useSession();
@@ -86,6 +86,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: msg,
+          projectId,
           messages: messages.concat({ id: "", role: "user", content: msg, timestamp: Date.now() })
             .map((m) => ({ role: m.role === "ai" ? "assistant" : "user", content: m.content })),
           projectContext: {
@@ -167,7 +168,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
             <div>
               <p className="text-sm font-bold text-slate-300 mb-1">AI Builder Ready</p>
               <p className="text-xs text-slate-500 max-w-[200px]">
-                Describe what you want to build and I'll generate the code instantly.
+                Describe the website you want to build...
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">

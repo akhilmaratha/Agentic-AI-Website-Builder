@@ -25,3 +25,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+// DELETE: Clear message history for logged-in user to start fresh
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await connectToDatabase();
+
+    await ChatMessage.deleteMany({ userEmail: session.user.email });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[messages DELETE API] Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}

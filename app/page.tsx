@@ -88,8 +88,8 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const handleGenerate = () => {
-    if (!inputValue.trim()) return;
+  const startNewProject = async (userPrompt: string) => {
+    if (!userPrompt.trim()) return;
     if (status === "unauthenticated") {
       toast.error("Please login to create a website.", {
         style: { borderRadius: "10px", background: "#1e293b", color: "#fff" },
@@ -98,20 +98,29 @@ export default function HomePage() {
       return;
     }
     setIsLoading(true);
-    setPrompt(inputValue.trim());
-    setProjectName(inputValue.trim().slice(0, 40) + (inputValue.length > 40 ? "..." : ""));
-    setTimeout(() => router.push("/builder"), 400);
-  };
 
-  const handleTemplateClick = (prompt: string) => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-      return;
+    // Clear local builder store state to guarantee a fresh chat UI
+    const store = useBuilderStore.getState();
+    store.clearMessages();
+    store.updateFiles({});
+    store.updatePreview("");
+    store.setFileTree([]);
+    store.setActiveFile("");
+
+    // Instruct the backend to clear existing session messages
+    try {
+      await fetch("/api/messages", { method: "DELETE" });
+    } catch (e) {
+      console.error("Failed to clear chat context", e);
     }
-    setPrompt(prompt);
-    setProjectName(prompt.slice(0, 40));
+
+    setPrompt(userPrompt.trim());
+    setProjectName(userPrompt.trim().slice(0, 40) + (userPrompt.length > 40 ? "..." : ""));
     router.push("/builder");
   };
+
+  const handleGenerate = () => startNewProject(inputValue);
+  const handleTemplateClick = (prompt: string) => startNewProject(prompt);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleGenerate();

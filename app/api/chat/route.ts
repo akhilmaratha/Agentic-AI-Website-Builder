@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import connectToDatabase from "@/lib/mongoose";
-import { ChatMessage, checkAndIncrementGeneration } from "@/server/models";
+import { ChatMessage, checkAndIncrementGeneration, FileModel, Project, User, Version } from "@/server/models";
 
 // ─────────────────────────────────────────────
 // Types
@@ -11,6 +11,7 @@ interface ChatRequestBody {
   message?: string;
   messages?: { role: string; content: string }[];
   prompt?: string;
+  projectId?: string;
   projectContext?: {
     projectName?: string;
     files?: Record<string, string>;
@@ -91,6 +92,87 @@ function buildPreviewHTML(title = "Preview", bodyHTML = ""): string {
   ${bodyHTML || `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#64748b;font-size:1rem;">Preview rendered in iframe</div>`}
 </body>
 </html>`;
+}
+
+function deriveProjectNameFromPrompt(prompt: string): string {
+  const normalized = prompt
+    .replace(/["'`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const patterns = [
+    /create\s+(?:a|an)?\s*(.+)/i,
+    /build\s+(?:a|an)?\s*(.+)/i,
+    /make\s+(?:a|an)?\s*(.+)/i,
+    /design\s+(?:a|an)?\s*(.+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match?.[1]) {
+      const raw = match[1].split(/[.,!?]/)[0].trim();
+      const clipped = raw.slice(0, 48).trim();
+      if (!clipped) continue;
+      return clipped
+        .split(" ")
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
+    }
+  }
+
+  const fallback = normalized.slice(0, 48).trim();
+  if (!fallback) return "New Project";
+  return fallback
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+async function generateProjectName(prompt: string): Promise<string> {
+  const fallback = deriveProjectNameFromPrompt(prompt);
+  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
+  if (!apiKey) return fallback;
+
+  const baseURL = process.env.AI_BASE_URL || "https://api.openai.com/v1";
+  const model = process.env.AI_MODEL || "gpt-4o-mini";
+
+  try {
+    const res = await fetch(`${baseURL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        max_tokens: 20,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You create concise website project names. Return only a short title (2-5 words), no punctuation at the end.",
+          },
+          {
+            role: "user",
+            content: `Prompt: ${prompt}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const candidate = String(data?.choices?.[0]?.message?.content || "").trim();
+    if (!candidate) return fallback;
+
+    const normalized = candidate.replace(/["'`]/g, "").slice(0, 48).trim();
+    return normalized || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -688,6 +770,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     const body = (await req.json()) as ChatRequestBody;
     const userMessage = body.message || body.prompt || "";
+    const projectId = body.projectId;
 
     if (!userMessage.trim() && !body.messages?.length) {
       return NextResponse.json({ error: "message or prompt is required" }, { status: 400 });
@@ -752,14 +835,29 @@ export async function POST(req: NextRequest) {
       result = localGenerate(conversationMessages[conversationMessages.length - 1]?.content ?? userMessage);
     }
 
-    // Save chat history to DB if user is logged in
+    // Save chat history and generated state to DB if user is logged in
     if (session && session.user?.email) {
       await connectToDatabase();
+
+      let projectDoc: { _id: string; name: string } | null = null;
+      if (projectId) {
+        const user = await User.findOne({ email: session.user.email }).select("_id").lean();
+        if (user?._id) {
+          projectDoc = await Project.findOne({
+            _id: projectId,
+            userId: user._id,
+            status: "active",
+          })
+            .select("_id name")
+            .lean();
+        }
+      }
       
       // Save User Message
       if (userMessage.trim()) {
         await ChatMessage.create({
           userEmail: session.user.email,
+          projectId: projectDoc?._id,
           role: 'user',
           content: userMessage,
         });
@@ -768,11 +866,56 @@ export async function POST(req: NextRequest) {
       // Save AI Response
       await ChatMessage.create({
         userEmail: session.user.email,
+        projectId: projectDoc?._id,
         role: 'ai',
         content: result.reply || "Done!",
         code: result.code,
         filename: result.filename,
       });
+
+      // Persist generated files for this project.
+      if (projectDoc?._id && result.files && Object.keys(result.files).length > 0) {
+        const updates = Object.entries(result.files).map(([path, content]) =>
+          FileModel.updateOne(
+            { projectId: projectDoc._id, path },
+            { $set: { content, updatedAt: new Date() } },
+            { upsert: true }
+          )
+        );
+        await Promise.all(updates);
+
+        const allFiles = await FileModel.find({ projectId: projectDoc._id }).lean();
+        const filesSnapshot = Object.fromEntries(allFiles.map((f) => [f.path, f.content]));
+        const latestVersion = await Version.findOne({ projectId: projectDoc._id })
+          .sort({ versionNumber: -1 })
+          .lean();
+
+        await Version.create({
+          projectId: projectDoc._id,
+          versionNumber: (latestVersion?.versionNumber ?? 0) + 1,
+          description: userMessage.trim() || "AI update",
+          filesSnapshot,
+          createdAt: new Date(),
+        });
+      }
+
+      // Keep project metadata fresh and auto-name after the first prompt.
+      if (projectDoc?._id) {
+        const projectUpdate: Record<string, unknown> = {
+          updatedAt: new Date(),
+        };
+
+        if (typeof result.preview === "string") {
+          projectUpdate.previewHTML = result.preview;
+        }
+
+        const isTemporaryName = projectDoc.name === "New Project" || /^Project\s+\d+$/i.test(projectDoc.name);
+        if (isTemporaryName && userMessage.trim()) {
+          projectUpdate.name = await generateProjectName(userMessage);
+        }
+
+        await Project.updateOne({ _id: projectDoc._id }, { $set: projectUpdate });
+      }
     }
 
     return NextResponse.json(result);

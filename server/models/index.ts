@@ -81,18 +81,22 @@ export async function getGenerationStatus(email: string): Promise<{ used: number
 export interface IProject extends Document {
   userId: mongoose.Types.ObjectId;
   name: string;
+  folderId?: mongoose.Types.ObjectId | null;
   framework: 'nextjs' | 'react' | 'html';
   status: 'active' | 'deleted';
+  previewHTML?: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 const ProjectSchema = new Schema<IProject>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
+  folderId: { type: Schema.Types.ObjectId, ref: 'Folder', default: null },
   framework: { type: String, enum: ['nextjs', 'react', 'html'], default: 'nextjs' },
   status: { type: String, enum: ['active', 'deleted'], default: 'active' },
-  createdAt: { type: Date, default: Date.now }
-});
+  previewHTML: { type: String, default: '' },
+}, { timestamps: true });
 
 export const Project = mongoose.models?.Project || mongoose.model<IProject>('Project', ProjectSchema);
 
@@ -173,6 +177,7 @@ export const Deployment = mongoose.models?.Deployment || mongoose.model<IDeploym
 // ─── Chat Messages ────────────────────────────────────────────────────────
 export interface IChatMessage extends Document {
   userEmail: string;
+  projectId?: mongoose.Types.ObjectId;
   role: 'user' | 'ai';
   content: string;
   code?: string;
@@ -182,6 +187,7 @@ export interface IChatMessage extends Document {
 
 const ChatMessageSchema = new Schema<IChatMessage>({
   userEmail: { type: String, required: true, index: true },
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', index: true },
   role: { type: String, enum: ['user', 'ai'], required: true },
   content: { type: String, required: true },
   code: { type: String },
@@ -190,3 +196,39 @@ const ChatMessageSchema = new Schema<IChatMessage>({
 });
 
 export const ChatMessage = mongoose.models?.ChatMessage || mongoose.model<IChatMessage>('ChatMessage', ChatMessageSchema);
+
+// ─── Folders ─────────────────────────────────────────────────────────────
+export interface IFolder extends Document {
+  userId: mongoose.Types.ObjectId;
+  name: string;
+  isCollapsed?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const FolderSchema = new Schema<IFolder>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  name: { type: String, required: true },
+  isCollapsed: { type: Boolean, default: false },
+}, { timestamps: true });
+
+export const Folder = mongoose.models?.Folder || mongoose.model<IFolder>('Folder', FolderSchema);
+
+// ─── Versions ────────────────────────────────────────────────────────────
+export interface IVersion extends Document {
+  projectId: mongoose.Types.ObjectId;
+  versionNumber: number;
+  description: string;
+  filesSnapshot: Record<string, string>;
+  createdAt: Date;
+}
+
+const VersionSchema = new Schema<IVersion>({
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
+  versionNumber: { type: Number, required: true },
+  description: { type: String, default: '' },
+  filesSnapshot: { type: Schema.Types.Mixed, default: {} },
+  createdAt: { type: Date, default: Date.now },
+});
+
+export const Version = mongoose.models?.Version || mongoose.model<IVersion>('Version', VersionSchema);

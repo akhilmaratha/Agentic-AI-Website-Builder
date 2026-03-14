@@ -151,7 +151,7 @@ export default function DashboardPage() {
                   <button className="p-2 border border-slate-700 rounded-lg hover:text-blue-400 hover:border-blue-500/50 transition-colors" title="Preview">
                     <Eye className="w-4 h-4" />
                   </button>
-                  <Link href={`/builder?id=${p._id}`} className="p-2 border border-slate-700 rounded-lg bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white transition-colors" title="Edit in Builder">
+                  <Link href={`/builder?projectId=${p._id}`} className="p-2 border border-slate-700 rounded-lg bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white transition-colors" title="Edit in Builder">
                     <Edit2 className="w-4 h-4" />
                   </Link>
                 </div>

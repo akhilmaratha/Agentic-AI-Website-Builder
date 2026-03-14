@@ -33,8 +33,11 @@ export interface BuilderState {
   setPrompt: (prompt: string) => void;
 
   // ── Project ───────────────────────────────────
+  projectId: string;
+  setProjectId: (id: string) => void;
   projectName: string;
   setProjectName: (name: string) => void;
+  resetProjectState: () => void;
 
   // ── Chat messages ─────────────────────────────
   messages: ChatMessage[];
@@ -45,6 +48,7 @@ export interface BuilderState {
 
   // ── Generated files (path → code) ────────────
   files: Record<string, string>;
+  setFiles: (files: Record<string, string>) => void;
   updateFiles: (files: Record<string, string>) => void;
   setFileContent: (path: string, content: string) => void;
 
@@ -141,8 +145,22 @@ export const useBuilderStore = create<BuilderState>()(
       setPrompt: (prompt) => set({ prompt }),
 
       // ── Project ──────────────────────────────
+      projectId: "",
+      setProjectId: (projectId) => set({ projectId }),
       projectName: "My AI Project",
       setProjectName: (projectName) => set({ projectName }),
+      resetProjectState: () =>
+        set({
+          messages: [],
+          files: {},
+          activeFile: "",
+          previewHTML: "",
+          fileTree: [],
+          rightTab: "code",
+          isGenerating: false,
+          terminalLogs: [],
+          viewport: "desktop",
+        }),
 
       // ── Messages ─────────────────────────────
       messages: [],
@@ -174,6 +192,11 @@ export const useBuilderStore = create<BuilderState>()(
 
       // ── Files ─────────────────────────────────
       files: DEFAULT_FILES,
+      setFiles: (files) => {
+        const tree = pathsToTree(files);
+        const firstFile = Object.keys(files)[0] ?? "";
+        set({ files, fileTree: tree, activeFile: firstFile });
+      },
       updateFiles: (newFiles) => {
         set((s) => {
           const merged = { ...s.files, ...newFiles };
@@ -236,6 +259,7 @@ export const useBuilderStore = create<BuilderState>()(
       name: "agentic-builder-store",
       partialize: (state) => ({
         prompt: state.prompt,
+        projectId: state.projectId,
         projectName: state.projectName,
         files: state.files,
         previewHTML: state.previewHTML,
