@@ -2,15 +2,20 @@
 
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { FolderKanban, Plus, Eye, Edit2 } from "lucide-react";
+import { FolderKanban, Plus, Eye, Edit2, Crown, Zap } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [stats, setStats] = useState({ totalProjects: 0, generations: 0, deployments: 0 });
+  const [stats, setStats] = useState({ totalProjects: 0, deployments: 0 });
   const [recentProjects, setRecentProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const plan = (session?.user as any)?.plan || "free";
+  const isPro = plan === "pro" || plan === "enterprise";
+  const generationsToday = (session?.user as any)?.generationsToday || 0;
+  const generationLimit = (session?.user as any)?.generationLimit || 5;
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -18,15 +23,11 @@ export default function DashboardPage() {
         const res = await fetch("/api/projects");
         if (res.ok) {
           const data = await res.json();
-          // Assume API returns projects
           const projects = data.projects || [];
           setRecentProjects(projects.slice(0, 3));
-          
-          // Estimate stats based on projects
           setStats({
             totalProjects: projects.length,
-            generations: projects.length * 5, // Placeholder
-            deployments: projects.length, // Placeholder
+            deployments: projects.length,
           });
         }
       } catch (err) {
@@ -55,17 +56,63 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        {[
-          { label: "Total Projects", value: stats.totalProjects, color: "text-blue-400" },
-          { label: "Generations Used", value: stats.generations, color: "text-purple-400" },
-          { label: "Current Plan", value: (session?.user as any)?.plan || "Free", color: "text-emerald-400 capitalize" },
-          { label: "Deployments", value: stats.deployments, color: "text-amber-400" },
-        ].map((stat, i) => (
-          <div key={i} className="p-6 rounded-2xl border border-slate-800 bg-slate-900/50 hover:border-slate-700 transition-all">
-            <p className="text-sm text-slate-400 mb-2">{stat.label}</p>
-            <p className={`text-3xl font-black ${stat.color}`}>{loading ? "-" : stat.value}</p>
+        {/* Total Projects */}
+        <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/50 hover:border-slate-700 transition-all">
+          <p className="text-sm text-slate-400 mb-2">Total Projects</p>
+          <p className="text-3xl font-black text-blue-400">{loading ? "-" : stats.totalProjects}</p>
+        </div>
+
+        {/* AI Generations */}
+        <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/50 hover:border-slate-700 transition-all">
+          <p className="text-sm text-slate-400 mb-2">Generations Today</p>
+          <div className="flex items-end gap-2">
+            <p className="text-3xl font-black text-purple-400">{generationsToday}</p>
+            {isPro ? (
+              <span className="text-xs text-purple-400/60 font-bold mb-1">/ ∞</span>
+            ) : (
+              <span className="text-xs text-slate-500 font-bold mb-1">/ {generationLimit}</span>
+            )}
           </div>
-        ))}
+          {!isPro && (
+            <div className="h-1 bg-slate-800 rounded-full mt-3 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  generationsToday >= generationLimit ? "bg-red-500" : "bg-purple-600"
+                }`}
+                style={{ width: `${Math.min((generationsToday / generationLimit) * 100, 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Current Plan */}
+        <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/50 hover:border-slate-700 transition-all">
+          <p className="text-sm text-slate-400 mb-2">Current Plan</p>
+          <div className="flex items-center gap-2">
+            {isPro ? (
+              <>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-600/20 text-purple-400 border border-purple-600/20 flex items-center gap-1">
+                  <Crown className="w-3.5 h-3.5" /> Pro
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                  Free
+                </span>
+                <Link href="/pricing" className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+                  Upgrade →
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Deployments */}
+        <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/50 hover:border-slate-700 transition-all">
+          <p className="text-sm text-slate-400 mb-2">Deployments</p>
+          <p className="text-3xl font-black text-amber-400">{loading ? "-" : stats.deployments}</p>
+        </div>
       </div>
 
       <div>
@@ -96,7 +143,7 @@ export default function DashboardPage() {
                 <div className="flex flex-col">
                   <span className="font-bold text-lg group-hover:text-blue-400 transition-colors">{p.name || "Untitled Project"}</span>
                   <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                    <span className="px-2 py-0.5 rounded outline-1 outline-slate-700 bg-slate-800">{p.framework || "Next.js"}</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">{p.framework || "Next.js"}</span>
                     <span>Created: {new Date(p.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>

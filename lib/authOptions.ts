@@ -62,8 +62,15 @@ export const authOptions: NextAuthOptions = {
           if (dbUser) {
             (session.user as Record<string, unknown>).plan = dbUser.plan;
             (session.user as Record<string, unknown>).dbId = dbUser._id;
-            (session.user as Record<string, unknown>).generationsToday = dbUser.generationsToday || 0;
-            (session.user as Record<string, unknown>).lastGenerationDate = dbUser.lastGenerationDate;
+            (session.user as Record<string, unknown>).subscriptionStatus = dbUser.subscriptionStatus;
+            
+            // Auto-reset generation count if the day changed
+            const today = new Date().toDateString();
+            const lastGen = dbUser.lastGenerationDate ? dbUser.lastGenerationDate.toDateString() : '';
+            const todayCount = (today === lastGen) ? dbUser.generationsToday : 0;
+            
+            (session.user as Record<string, unknown>).generationsToday = todayCount;
+            (session.user as Record<string, unknown>).generationLimit = dbUser.plan === 'pro' ? -1 : 5;
           }
         } catch (e) {}
       }

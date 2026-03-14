@@ -10,12 +10,18 @@ import {
   User,
   CreditCard,
   LogOut,
-  Zap
+  Zap,
+  Crown,
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data: session } = useSession();
+
+  const plan = (session?.user as any)?.plan || "free";
+  const isPro = plan === "pro" || plan === "enterprise";
+  const generationsToday = (session?.user as any)?.generationsToday || 0;
+  const generationLimit = (session?.user as any)?.generationLimit || 5;
 
   const links = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -58,6 +64,45 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </div>
 
+        {/* Usage Card in Sidebar */}
+        <div className="mx-4 mb-4 p-4 rounded-xl border border-slate-800 bg-slate-900/50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-slate-400">AI Usage</span>
+            {isPro ? (
+              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-600/20 text-purple-400 flex items-center gap-1 uppercase tracking-wider">
+                <Crown className="w-2.5 h-2.5" /> Pro
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 uppercase tracking-wider">
+                Free
+              </span>
+            )}
+          </div>
+          {isPro ? (
+            <p className="text-xs text-emerald-400 font-semibold">Unlimited generations ∞</p>
+          ) : (
+            <>
+              <div className="flex items-end justify-between mb-2">
+                <span className="text-2xl font-black text-white">{generationsToday}</span>
+                <span className="text-xs text-slate-500 mb-0.5">/ {generationLimit} today</span>
+              </div>
+              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    generationsToday >= generationLimit ? "bg-red-500" : "bg-blue-600"
+                  }`}
+                  style={{ width: `${Math.min((generationsToday / generationLimit) * 100, 100)}%` }}
+                />
+              </div>
+              {generationsToday >= generationLimit && (
+                <Link href="/pricing" className="block mt-2 text-[10px] text-red-400 hover:text-red-300 font-bold transition-colors">
+                  Upgrade for unlimited →
+                </Link>
+              )}
+            </>
+          )}
+        </div>
+
         <div className="p-4 border-t border-slate-800">
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
@@ -77,14 +122,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             {pathname.split("/").pop()}
           </h1>
           <div className="flex items-center gap-4">
+            {/* Plan Badge */}
+            {isPro ? (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-600/20 text-purple-400 border border-purple-600/20 flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5" /> Pro Plan
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                Free Plan
+              </span>
+            )}
+            
             {session?.user && (
               <div className="flex items-center gap-3">
                 <div className="text-right hidden md:block">
                   <p className="text-sm font-semibold text-white leading-tight">
                     {session.user.name || "User"}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                    {(session.user as any).plan || "FREE"} PLAN
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {isPro ? "Unlimited generations" : `${generationsToday} / ${generationLimit} generations today`}
                   </p>
                 </div>
                 {(session.user.image) ? (

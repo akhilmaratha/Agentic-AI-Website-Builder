@@ -7,7 +7,7 @@ export interface IUser extends Document {
   image?: string;
   provider: 'google' | 'github';
   plan: 'free' | 'pro' | 'enterprise';
-  subscriptionStatus?: 'active' | 'expired';
+  subscriptionStatus: 'active' | 'expired' | 'none';
   subscriptionStart?: Date;
   subscriptionEnd?: Date;
   generationsToday: number;
@@ -21,7 +21,7 @@ const UserSchema = new Schema<IUser>({
   image: { type: String },
   provider: { type: String, enum: ['google', 'github'], required: true },
   plan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
-  subscriptionStatus: { type: String, enum: ['active', 'expired'] },
+  subscriptionStatus: { type: String, enum: ['active', 'expired', 'none'], default: 'none' },
   subscriptionStart: { type: Date },
   subscriptionEnd: { type: Date },
   generationsToday: { type: Number, default: 0 },
@@ -30,6 +30,52 @@ const UserSchema = new Schema<IUser>({
 });
 
 export const User = mongoose.models?.User || mongoose.model<IUser>('User', UserSchema);
+
+// ─── Generation Limit Helper ──────────────────────────────────────────────
+const FREE_DAILY_LIMIT = 5;
+
+export async function checkAndIncrementGeneration(email: string): Promise<{ allowed: boolean; remaining: number; plan: string }> {
+  const user = await User.findOne({ email });
+  if (!user) return { allowed: false, remaining: 0, plan: 'free' };
+
+  // Pro users: unlimited
+  if (user.plan === 'pro' || user.plan === 'enterprise') {
+    return { allowed: true, remaining: -1, plan: user.plan }; // -1 = unlimited
+  }
+
+  // Auto-reset if date changed
+  const today = new Date().toDateString();
+  const lastGen = user.lastGenerationDate ? user.lastGenerationDate.toDateString() : '';
+  
+  if (today !== lastGen) {
+    user.generationsToday = 0;
+    user.lastGenerationDate = new Date();
+  }
+
+  if (user.generationsToday >= FREE_DAILY_LIMIT) {
+    return { allowed: false, remaining: 0, plan: 'free' };
+  }
+
+  user.generationsToday += 1;
+  await user.save();
+
+  return { allowed: true, remaining: FREE_DAILY_LIMIT - user.generationsToday, plan: 'free' };
+}
+
+export async function getGenerationStatus(email: string): Promise<{ used: number; limit: number; plan: string }> {
+  const user = await User.findOne({ email });
+  if (!user) return { used: 0, limit: FREE_DAILY_LIMIT, plan: 'free' };
+
+  if (user.plan === 'pro' || user.plan === 'enterprise') {
+    return { used: user.generationsToday || 0, limit: -1, plan: user.plan };
+  }
+
+  const today = new Date().toDateString();
+  const lastGen = user.lastGenerationDate ? user.lastGenerationDate.toDateString() : '';
+  const todayCount = (today === lastGen) ? user.generationsToday : 0;
+
+  return { used: todayCount, limit: FREE_DAILY_LIMIT, plan: 'free' };
+}
 
 // ─── Projects ─────────────────────────────────────────────────────────────
 export interface IProject extends Document {

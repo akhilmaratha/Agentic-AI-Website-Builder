@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import connectToDatabase from "@/lib/mongoose";
-import { ChatMessage, User } from "@/server/models";
+import { ChatMessage, checkAndIncrementGeneration } from "@/server/models";
 
 // ─────────────────────────────────────────────
 // Types
@@ -41,6 +41,12 @@ RULES:
 - Make layouts fully responsive
 - Use modern UI patterns (glassmorphism, gradients, smooth transitions)
 - Export components as default exports
+- IMPORTANT: For ALL images, use Unsplash source URLs. NEVER leave empty image placeholders.
+  - Hero images: https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&h=900&fit=crop
+  - Person/avatar: https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop
+  - Technology: https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=600&fit=crop
+  - Startup/office: https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=600&fit=crop
+  - All images must include: width, height attrs, className="w-full h-auto object-cover rounded-lg"
 
 OUTPUT FORMAT (strict JSON — no markdown fences, raw JSON only):
 {
@@ -677,37 +683,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "message or prompt is required" }, { status: 400 });
     }
 
-    // ── Enforce Generations Limit For Free Users ────────────────
-    let dbUser = null;
-    let limitReached = false;
-    
-    if (session && session.user?.email) {
-      await connectToDatabase();
-      dbUser = await User.findOne({ email: session.user.email });
-      
-      if (dbUser && dbUser.plan !== 'pro' && dbUser.plan !== 'enterprise') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        // Reset if it's a new day
-        if (!dbUser.lastGenerationDate || dbUser.lastGenerationDate < today) {
-          dbUser.generationsToday = 0;
-          dbUser.lastGenerationDate = new Date();
-        }
-
-        if (dbUser.generationsToday >= 5) {
-          limitReached = true;
-        }
-      }
-    }
-
-    if (limitReached) {
-      return NextResponse.json(
-        { type: "error", error: "LIMIT_REACHED", reply: "Daily generation limit reached. Please upgrade to Pro." },
-        { status: 403 }
-      );
-    }
-
     // Build conversation — filter out empty / streaming messages
     const conversationMessages: { role: string; content: string }[] = body.messages
       ? body.messages
@@ -727,6 +702,22 @@ export async function POST(req: NextRequest) {
       const note = ctx.currentFile ? `\n\n[Currently editing: ${ctx.currentFile}]` : "";
       const last = conversationMessages[conversationMessages.length - 1];
       if (last.role === "user") last.content += note;
+    }
+
+    // ── Check generation limits ──────────────────────────────
+    if (session && session.user?.email) {
+      await connectToDatabase();
+      const genCheck = await checkAndIncrementGeneration(session.user.email);
+      
+      if (!genCheck.allowed) {
+        return NextResponse.json({
+          type: "message_only",
+          reply: "⚠️ **Daily generation limit reached!**\n\nYou've used all 5 free AI generations for today. Upgrade to Pro for unlimited generations.\n\n[Upgrade to Pro →](/pricing)",
+          limitReached: true,
+          remaining: 0,
+          plan: genCheck.plan,
+        });
+      }
     }
 
     // ── Try real AI ──────────────────────────────────────────
@@ -770,13 +761,6 @@ export async function POST(req: NextRequest) {
         code: result.code,
         filename: result.filename,
       });
-
-      // Increment limits 
-      if (dbUser) {
-        dbUser.generationsToday = (dbUser.generationsToday || 0) + 1;
-        dbUser.lastGenerationDate = new Date();
-        await dbUser.save();
-      }
     }
 
     return NextResponse.json(result);
