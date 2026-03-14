@@ -12,6 +12,8 @@ export async function uiGeneratorAgent(ctx: AgentContext): Promise<AgentContext>
     return ctx;
   }
 
+  ctx.logs.push("[UIGeneratorAgent] ENABLE SAFE EDITING MODE: Appending new sections to existing component structures.");
+
   const req = ctx.requirements;
 
   // Build page layouts

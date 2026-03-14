@@ -32,12 +32,18 @@ interface ChatResponse {
 // ─────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are an expert Next.js developer working inside an AI website builder.
 
-Your job is to generate React + Tailwind CSS components for websites.
+ENABLE SAFE EDITING MODE:
+1. NEVER delete the existing UI unless explicitly instructed.
+2. NEVER regenerate the entire page. Only modify the required sections of the code.
+3. Always preserve existing components. Append new sections instead of replacing them.
+4. Add new UI sections as separate reusable components in the \`components/\` directory.
+5. Identify the main page layout and insert your new component without removing existing layout code.
+6. Return incremental code changes. If adding a 'Testimonials' section to a page that has <Hero /> and <Features />, your updated page must include <Hero />, <Features />, AND <Testimonials />. Do not overwrite the layout.
 
-RULES:
+STRICT RULES:
 - Use functional React components with TypeScript
 - Use Tailwind CSS for all styling (dark theme preferred: slate-900 bg, blue-600 accent)
-- Keep components modular and reusable
+- Keep components modular and reusable (e.g., \`components/Hero.tsx\`, \`components/Pricing.tsx\`)
 - Make layouts fully responsive
 - Use modern UI patterns (glassmorphism, gradients, smooth transitions)
 - Export components as default exports
@@ -51,10 +57,11 @@ RULES:
 OUTPUT FORMAT (strict JSON — no markdown fences, raw JSON only):
 {
   "type": "code_update",
+  "operation": "insert_section",
   "reply": "A short friendly explanation of what you built",
   "files": {
-    "src/components/ComponentName.tsx": "// full component code here",
-    "src/pages/index.tsx": "// page code here"
+    "src/components/NewComponent.tsx": "// full component code here",
+    "src/pages/index.tsx": "// incremented page layout preserving all previous components"
   },
   "preview": "<!DOCTYPE html><html>...</html>"
 }
@@ -630,7 +637,10 @@ async function callAIModel(
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...normalized],
+      messages: [{ 
+        role: "system", 
+        content: SYSTEM_PROMPT 
+      }, ...normalized],
       temperature: 0.7,
       max_tokens: 4096,
       response_format: { type: "json_object" },
@@ -700,8 +710,10 @@ export async function POST(req: NextRequest) {
     if (body.projectContext && conversationMessages.length > 0) {
       const ctx = body.projectContext;
       const note = ctx.currentFile ? `\n\n[Currently editing: ${ctx.currentFile}]` : "";
+      const existingFilesList = ctx.files ? `\n\n[EXISTING PROJECT FILES DO NOT DELETE]:\n${Object.keys(ctx.files).join('\n')}\n[Note: When generating a component inside an existing page, DO NOT delete the existing imported tags inside the layout.]` : "";
+      
       const last = conversationMessages[conversationMessages.length - 1];
-      if (last.role === "user") last.content += note;
+      if (last.role === "user") last.content += note + existingFilesList;
     }
 
     // ── Check generation limits ──────────────────────────────

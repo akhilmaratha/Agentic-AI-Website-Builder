@@ -6,6 +6,7 @@ export interface AgentContext {
   requirements?: StructuredRequirements;
   plan?: BuildPlan;
   componentStructure?: ComponentStructure;
+  existingFiles?: Record<string, string>;
   generatedFiles?: Record<string, string>;
   debugReport?: DebugReport;
   previewHTML?: string;

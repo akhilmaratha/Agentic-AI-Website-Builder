@@ -15,21 +15,48 @@ export async function codeGeneratorAgent(ctx: AgentContext): Promise<AgentContex
   const req = ctx.requirements;
   const files: Record<string, string> = {};
 
-  // ── Generate each component ─────────────────────────────
+  // ── Generate each component (do not overwrite existing unless told) ──────
   for (const componentName of req.components) {
-    const code = generateComponent(componentName, req.projectType, req.colorScheme);
-    files[`src/components/${componentName}.tsx`] = code;
+    const existingComponent = ctx.existingFiles?.[`src/components/${componentName}.tsx`];
+    if (existingComponent) {
+      files[`src/components/${componentName}.tsx`] = existingComponent; // Preserve old component
+    } else {
+      const code = generateComponent(componentName, req.projectType, req.colorScheme);
+      files[`src/components/${componentName}.tsx`] = code;
+    }
   }
 
-  // ── Generate page assemblies ────────────────────────────
+  // ── Generate page assemblies (SAFE EDITING: preserve layout) ───────────
   for (const page of ctx.componentStructure.pages) {
-    const imports = page.components
-      .map((c) => `import ${c} from '../components/${c}';`)
-      .join("\n");
+    const pagePath = `src/pages/${page.name}.tsx`;
+    let existingPage = ctx.existingFiles?.[pagePath];
 
-    const elements = page.components.map((c) => `      <${c} />`).join("\n");
+    if (existingPage) {
+      // Safe Editing: parse and insert new components
+      let updatedPage = existingPage;
+      for (const comp of page.components) {
+        // Insert import if missing
+        if (!updatedPage.includes(`import ${comp} `)) {
+          updatedPage = `import ${comp} from '../components/${comp}';\n` + updatedPage;
+        }
+        // Insert component into the layout if missing
+        if (!updatedPage.includes(`<${comp} />`)) {
+          // Find closing div to inject above
+          const injectIndex = updatedPage.lastIndexOf('</div>');
+          if (injectIndex !== -1) {
+            updatedPage = updatedPage.slice(0, injectIndex) + `      <${comp} />\n    ` + updatedPage.slice(injectIndex);
+          } else {
+            updatedPage += `\n// Added missing component\n<${comp} />\n`;
+          }
+        }
+      }
+      files[pagePath] = updatedPage;
+    } else {
+      // New Page
+      const imports = page.components.map((c) => `import ${c} from '../components/${c}';`).join("\n");
+      const elements = page.components.map((c) => `      <${c} />`).join("\n");
 
-    files[`src/pages/${page.name}.tsx`] = `import React from 'react';
+      files[pagePath] = `import React from 'react';
 ${imports}
 
 export default function ${capitalize(page.name)}Page() {
@@ -40,6 +67,7 @@ ${elements}
   );
 }
 `;
+    }
   }
 
   // ── Generate styles ─────────────────────────────────────

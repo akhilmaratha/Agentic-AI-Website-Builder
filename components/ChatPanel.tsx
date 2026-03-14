@@ -90,7 +90,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
             .map((m) => ({ role: m.role === "ai" ? "assistant" : "user", content: m.content })),
           projectContext: {
             currentFile: activeFile,
-            files: Object.fromEntries(Object.entries(files).slice(0, 5)),
+            files: files, // Send ALL existing files for safe-editing mode!
           },
         }),
       });
@@ -128,7 +128,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
   };
 
   return (
-    <div className={`flex flex-col h-full bg-[#0a0b14]/60 ${!isFloating ? "w-[380px] border-r border-[#222949]" : "w-full"}`}>
+    <div className={`flex flex-col h-full bg-[#0a0b14]/60 ${!isFloating ? "w-[380px] min-w-[380px] border-r border-[#222949]" : "w-full"}`}>
       {/* Header element conditionally rendered below */}
       {/* Header */}
       <div className="px-4 py-3 border-b border-[#222949] flex items-center justify-between bg-[#0a0b14]">

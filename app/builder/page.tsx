@@ -190,7 +190,12 @@ export default function BuilderPage() {
 
       {/* ── MAIN WORKSPACE ──────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Left Sidebar: Chat Panel */}
+        {/* Left Sidebar: File Explorer */}
+        <aside className="w-64 border-r border-[#222949] bg-[#0a0b14] flex flex-col shrink-0">
+          <FileExplorer />
+        </aside>
+
+        {/* Left Sidebar 2: Chat Panel */}
         {isChatOpen && (
           <ChatPanel isFloating={false} />
         )}
