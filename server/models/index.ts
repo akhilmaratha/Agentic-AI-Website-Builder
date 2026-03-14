@@ -1,0 +1,146 @@
+import mongoose, { Schema, Document } from 'mongoose';
+
+// ─── Users ────────────────────────────────────────────────────────────────
+export interface IUser extends Document {
+  name: string;
+  email: string;
+  image?: string;
+  provider: 'google' | 'github';
+  plan: 'free' | 'pro' | 'enterprise';
+  subscriptionStatus?: 'active' | 'expired';
+  subscriptionStart?: Date;
+  subscriptionEnd?: Date;
+  generationsToday: number;
+  lastGenerationDate?: Date;
+  createdAt: Date;
+}
+
+const UserSchema = new Schema<IUser>({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  image: { type: String },
+  provider: { type: String, enum: ['google', 'github'], required: true },
+  plan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
+  subscriptionStatus: { type: String, enum: ['active', 'expired'] },
+  subscriptionStart: { type: Date },
+  subscriptionEnd: { type: Date },
+  generationsToday: { type: Number, default: 0 },
+  lastGenerationDate: { type: Date },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const User = mongoose.models?.User || mongoose.model<IUser>('User', UserSchema);
+
+// ─── Projects ─────────────────────────────────────────────────────────────
+export interface IProject extends Document {
+  userId: mongoose.Types.ObjectId;
+  name: string;
+  framework: 'nextjs' | 'react' | 'html';
+  status: 'active' | 'deleted';
+  createdAt: Date;
+}
+
+const ProjectSchema = new Schema<IProject>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  name: { type: String, required: true },
+  framework: { type: String, enum: ['nextjs', 'react', 'html'], default: 'nextjs' },
+  status: { type: String, enum: ['active', 'deleted'], default: 'active' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const Project = mongoose.models?.Project || mongoose.model<IProject>('Project', ProjectSchema);
+
+// ─── Files ────────────────────────────────────────────────────────────────
+export interface IFile extends Document {
+  projectId: mongoose.Types.ObjectId;
+  path: string;
+  content: string;
+  updatedAt: Date;
+}
+
+const FileSchema = new Schema<IFile>({
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+  path: { type: String, required: true },
+  content: { type: String, default: '' },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+export const FileModel = mongoose.models?.File || mongoose.model<IFile>('File', FileSchema);
+
+// ─── Generations ──────────────────────────────────────────────────────────
+export interface IGeneration extends Document {
+  projectId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  prompt: string;
+  generatedFiles: Record<string, string>;
+  createdAt: Date;
+}
+
+const GenerationSchema = new Schema<IGeneration>({
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  prompt: { type: String, required: true },
+  generatedFiles: { type: Schema.Types.Mixed, default: {} },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const Generation = mongoose.models?.Generation || mongoose.model<IGeneration>('Generation', GenerationSchema);
+
+// ─── Subscriptions ────────────────────────────────────────────────────────
+export interface ISubscription extends Document {
+  userId: mongoose.Types.ObjectId;
+  plan: 'free' | 'pro' | 'enterprise';
+  paymentProvider: 'razorpay' | 'stripe';
+  status: 'active' | 'canceled' | 'past_due';
+  expiresAt: Date;
+}
+
+const SubscriptionSchema = new Schema<ISubscription>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  plan: { type: String, enum: ['free', 'pro', 'enterprise'], required: true },
+  paymentProvider: { type: String, enum: ['razorpay', 'stripe'], required: true },
+  status: { type: String, enum: ['active', 'canceled', 'past_due'], default: 'active' },
+  expiresAt: { type: Date, required: true }
+});
+
+export const Subscription = mongoose.models?.Subscription || mongoose.model<ISubscription>('Subscription', SubscriptionSchema);
+
+// ─── Deployments ──────────────────────────────────────────────────────────
+export interface IDeployment extends Document {
+  projectId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  deploymentUrl: string;
+  provider: 'vercel' | 'aws';
+  createdAt: Date;
+}
+
+const DeploymentSchema = new Schema<IDeployment>({
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  deploymentUrl: { type: String, required: true },
+  provider: { type: String, enum: ['vercel', 'aws'], required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const Deployment = mongoose.models?.Deployment || mongoose.model<IDeployment>('Deployment', DeploymentSchema);
+
+// ─── Chat Messages ────────────────────────────────────────────────────────
+export interface IChatMessage extends Document {
+  userEmail: string;
+  role: 'user' | 'ai';
+  content: string;
+  code?: string;
+  filename?: string;
+  createdAt: Date;
+}
+
+const ChatMessageSchema = new Schema<IChatMessage>({
+  userEmail: { type: String, required: true, index: true },
+  role: { type: String, enum: ['user', 'ai'], required: true },
+  content: { type: String, required: true },
+  code: { type: String },
+  filename: { type: String },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const ChatMessage = mongoose.models?.ChatMessage || mongoose.model<IChatMessage>('ChatMessage', ChatMessageSchema);

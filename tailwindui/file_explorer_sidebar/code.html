@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WebBuilder IDE - Explorer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2547f4",
+                        "background-light": "#f5f6f8",
+                        "background-dark": "#101322",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-hidden h-screen">
+<div class="flex flex-col h-full">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between border-b border-primary/20 bg-background-light dark:bg-background-dark px-4 py-2 shrink-0">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-2xl font-bold">terminal</span>
+<h2 class="text-slate-900 dark:text-slate-100 text-sm font-bold tracking-tight uppercase">WebBuilder IDE</h2>
+</div>
+<nav class="hidden md:flex items-center gap-4">
+<a class="text-slate-600 dark:text-slate-400 text-xs font-medium hover:text-primary transition-colors" href="#">File</a>
+<a class="text-slate-600 dark:text-slate-400 text-xs font-medium hover:text-primary transition-colors" href="#">Edit</a>
+<a class="text-slate-600 dark:text-slate-400 text-xs font-medium hover:text-primary transition-colors" href="#">View</a>
+<a class="text-slate-600 dark:text-slate-400 text-xs font-medium hover:text-primary transition-colors" href="#">Terminal</a>
+</nav>
+</div>
+<div class="flex items-center gap-4 flex-1 justify-center max-w-md">
+<div class="flex w-full items-center rounded-lg bg-primary/5 dark:bg-primary/10 border border-primary/20 px-3 py-1">
+<span class="material-symbols-outlined text-slate-500 text-sm">search</span>
+<input class="w-full bg-transparent border-none focus:ring-0 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-500" placeholder="Search project files..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-1.5 rounded-lg hover:bg-primary/10 text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined text-xl">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="User profile avatar placeholder" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMGA9eqq_FTN_y1Z_aQaB6M-XeulQlbA_UFcMHzl33f9K80csegIolEgvEXeacJoPysstmac1qDXEt9PWfZf2usNArDXBjR2_dBIPKbYa6nMZyKxflnkfwR3Ygh1IrzuQsRY77Cn3bigtMcg2uF3nialv92ORR9wPwL7G21WzD6BIawP5LWyqcUz52mnPD5Pz5iQeZ6dMIzC7SVNjBznZX8l8-3HOrhYjh1etprNe6deIwg5NHIqBBe4onReCyQED9KuUmw2VeprQ"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 border-r border-primary/20 bg-background-light dark:bg-background-dark flex flex-col shrink-0 relative">
+<!-- Activity Bar (Icons on left) -->
+<div class="flex flex-col items-center py-4 gap-6 w-12 border-r border-primary/10 absolute left-0 top-0 bottom-0 bg-primary/5">
+<button class="text-primary"><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">file_copy</span></button>
+<button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">search</span></button>
+<button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">account_tree</span></button>
+<button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">bug_report</span></button>
+<button class="text-slate-400 hover:text-primary mt-auto"><span class="material-symbols-outlined">person</span></button>
+<button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">settings</span></button>
+</div>
+<div class="pl-12 flex flex-col h-full">
+<!-- Explorer Title -->
+<div class="flex items-center justify-between px-4 py-3">
+<span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-widest uppercase">Explorer</span>
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-sm text-slate-500 cursor-pointer hover:text-primary">note_add</span>
+<span class="material-symbols-outlined text-sm text-slate-500 cursor-pointer hover:text-primary">create_new_folder</span>
+<span class="material-symbols-outlined text-sm text-slate-500 cursor-pointer hover:text-primary">refresh</span>
+</div>
+</div>
+<!-- File Tree -->
+<div class="flex-1 overflow-y-auto no-scrollbar">
+<details class="group" open="">
+<summary class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-primary/10 select-none">
+<span class="material-symbols-outlined text-sm transition-transform group-open:rotate-90 text-slate-500">chevron_right</span>
+<span class="text-xs font-semibold text-slate-700 dark:text-slate-300">src</span>
+</summary>
+<div class="ml-4">
+<!-- Components Folder -->
+<details class="group/sub" open="">
+<summary class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-primary/10 select-none">
+<span class="material-symbols-outlined text-sm transition-transform group-open/sub:rotate-90 text-slate-500">chevron_right</span>
+<span class="material-symbols-outlined text-sm text-primary/70">folder_open</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">components</span>
+</summary>
+<div class="ml-4 flex flex-col">
+<!-- Active File -->
+<div class="flex items-center gap-2 px-2 py-1 bg-primary/20 border-l-2 border-primary cursor-pointer">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs text-slate-900 dark:text-slate-100 font-medium">Navbar.tsx</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">Hero.tsx</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">Footer.tsx</span>
+</div>
+</div>
+</details>
+<!-- Pages Folder -->
+<details class="group/sub">
+<summary class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-primary/10 select-none">
+<span class="material-symbols-outlined text-sm transition-transform group-open/sub:rotate-90 text-slate-500">chevron_right</span>
+<span class="material-symbols-outlined text-sm text-primary/70">folder</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">pages</span>
+</summary>
+<div class="ml-4 flex flex-col">
+<div class="flex items-center gap-2 px-2 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">index.tsx</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">pricing.tsx</span>
+</div>
+</div>
+</details>
+<!-- Styles Folder (With Context Menu Visualization) -->
+<details class="group/sub">
+<summary class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-primary/10 select-none relative">
+<span class="material-symbols-outlined text-sm transition-transform group-open/sub:rotate-90 text-slate-500">chevron_right</span>
+<span class="material-symbols-outlined text-sm text-primary/70">folder</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">styles</span>
+<!-- Context Menu Visualization Tooltip -->
+<div class="absolute left-24 top-4 z-50 w-48 bg-background-light dark:bg-slate-800 border border-primary/30 rounded shadow-xl py-1 animate-in fade-in zoom-in duration-75">
+<div class="px-3 py-1.5 hover:bg-primary hover:text-white text-[11px] flex justify-between items-center cursor-default">
+<span>New File</span>
+<span class="opacity-50 text-[9px]">Alt+N</span>
+</div>
+<div class="px-3 py-1.5 hover:bg-primary hover:text-white text-[11px] flex justify-between items-center cursor-default">
+<span>New Folder</span>
+</div>
+<div class="h-px bg-primary/10 my-1"></div>
+<div class="px-3 py-1.5 hover:bg-primary hover:text-white text-[11px] flex justify-between items-center cursor-default">
+<span>Rename</span>
+<span class="opacity-50 text-[9px]">F2</span>
+</div>
+<div class="px-3 py-1.5 hover:bg-primary hover:text-white text-[11px] flex justify-between items-center cursor-default text-red-500">
+<span>Delete</span>
+<span class="opacity-50 text-[9px]">Del</span>
+</div>
+</div>
+</summary>
+<div class="ml-4 flex flex-col">
+<div class="flex items-center gap-2 px-2 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-primary/60">css</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">globals.css</span>
+</div>
+</div>
+</details>
+</div>
+</details>
+<!-- Top Level Files -->
+<div class="flex flex-col mt-2">
+<div class="flex items-center gap-2 px-4 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-orange-400">settings</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">package.json</span>
+</div>
+<div class="flex items-center gap-2 px-4 py-1 hover:bg-primary/10 cursor-pointer">
+<span class="material-symbols-outlined text-sm text-slate-400 font-bold">description</span>
+<span class="text-xs text-slate-600 dark:text-slate-400">README.md</span>
+</div>
+</div>
+</div>
+<!-- Bottom Project Info -->
+<div class="mt-auto border-t border-primary/10 p-4">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Git Status</span>
+<span class="text-[10px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">Main</span>
+</div>
+<div class="flex items-center gap-2 opacity-60">
+<span class="material-symbols-outlined text-sm">sync</span>
+<span class="text-[10px]">3 outgoing, 1 incoming</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Workspace Content (Mockup) -->
+<main class="flex-1 bg-background-light dark:bg-[#0a0c16] flex flex-col">
+<div class="flex border-b border-primary/10 bg-background-light dark:bg-background-dark/50 overflow-x-auto no-scrollbar">
+<div class="flex items-center gap-2 px-4 py-2 bg-primary/10 border-t border-primary border-r border-primary/10">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs font-medium">Navbar.tsx</span>
+<span class="material-symbols-outlined text-[10px] cursor-pointer hover:bg-primary/20 rounded-full p-0.5">close</span>
+</div>
+<div class="flex items-center gap-2 px-4 py-2 border-r border-primary/10 opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+<span class="material-symbols-outlined text-sm text-blue-400">javascript</span>
+<span class="text-xs font-medium">Hero.tsx</span>
+<span class="material-symbols-outlined text-[10px] cursor-pointer">close</span>
+</div>
+</div>
+<!-- Code Editor Mockup Area -->
+<div class="flex-1 p-6 font-mono text-sm overflow-auto">
+<div class="flex gap-4">
+<div class="text-slate-500 dark:text-slate-600 text-right select-none w-8">
+                            1<br/>2<br/>3<br/>4<br/>5<br/>6<br/>7<br/>8<br/>9<br/>10<br/>11<br/>12
+                        </div>
+<div class="text-slate-800 dark:text-slate-300">
+<span class="text-primary">import</span> React <span class="text-primary">from</span> <span class="text-green-500">'react'</span>;<br/>
+<span class="text-primary">import</span> { Logo } <span class="text-primary">from</span> <span class="text-green-500">'./Logo'</span>;<br/>
+<br/>
+<span class="text-primary">export const</span> Navbar = () =&gt; {<br/>
+                              <span class="text-primary">return</span> (<br/>
+                                &lt;<span class="text-blue-500">nav</span> <span class="text-orange-400">className</span>=<span class="text-green-500">"flex justify-between"</span>&gt;<br/>
+                                  &lt;<span class="text-blue-500">Logo</span> /&gt;<br/>
+                                  &lt;<span class="text-blue-500">div</span>&gt;Menu&lt;/<span class="text-blue-500">div</span>&gt;<br/>
+                                &lt;/<span class="text-blue-500">nav</span>&gt;<br/>
+                              );<br/>
+                            };<br/>
+</div>
+</div>
+</div>
+<!-- Status Bar -->
+<footer class="h-6 bg-primary text-white flex items-center justify-between px-3 text-[10px] font-medium shrink-0">
+<div class="flex items-center gap-4 h-full">
+<div class="flex items-center gap-1.5 hover:bg-white/10 px-2 h-full cursor-pointer">
+<span class="material-symbols-outlined text-xs">account_tree</span>
+<span>main*</span>
+</div>
+<div class="flex items-center gap-1.5 hover:bg-white/10 px-2 h-full cursor-pointer">
+<span class="material-symbols-outlined text-xs">error</span>
+<span>0</span>
+<span class="material-symbols-outlined text-xs">warning</span>
+<span>2</span>
+</div>
+</div>
+<div class="flex items-center gap-4 h-full">
+<span class="hover:bg-white/10 px-2 h-full flex items-center cursor-pointer">Ln 14, Col 21</span>
+<span class="hover:bg-white/10 px-2 h-full flex items-center cursor-pointer">Spaces: 2</span>
+<span class="hover:bg-white/10 px-2 h-full flex items-center cursor-pointer">UTF-8</span>
+<span class="hover:bg-white/10 px-2 h-full flex items-center cursor-pointer">TypeScript JSX</span>
+<span class="material-symbols-outlined text-xs px-2 cursor-pointer hover:bg-white/10 h-full flex items-center">notifications</span>
+</div>
+</footer>
+</main>
+</div>
+</div>
+</body></html>

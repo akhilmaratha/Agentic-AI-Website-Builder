@@ -1,26 +1,60 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --primary: #2547f4;
+  --bg-dark: #0a0b14;
+  --surface-dark: #161b33;
+  --border-dark: #222949;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
+  background: #0a0b14;
+  color: #f1f5f9;
+  overflow-x: hidden;
 }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0a0b14; }
+::-webkit-scrollbar-thumb { background: #222949; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #2547f4; }
+
+/* Custom utility classes */
+.grid-bg {
+  background-image: radial-gradient(circle at 1px 1px, rgba(37, 71, 244, 0.1) 1px, transparent 0);
+  background-size: 40px 40px;
+}
+
+.glow-orb {
+  filter: blur(120px);
+  opacity: 0.15;
+  z-index: -1;
+}
+
+/* Custom animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in-up  { animation: fadeInUp 0.4s ease forwards; }
+.animate-slide-left  { animation: slideInLeft 0.3s ease forwards; }
+.animate-slide-right { animation: slideInRight 0.3s ease forwards; }
+
+/* Typing indicator dots */
+.typing-dot {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }

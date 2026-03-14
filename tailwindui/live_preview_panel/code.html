@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Live Preview Panel</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2547f4",
+                        "background-light": "#f5f6f8",
+                        "background-dark": "#101322",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<!-- Top Navigation Bar / Workspace Header -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark/50 px-6 py-3 backdrop-blur-md z-10">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="flex items-center justify-center size-8 rounded-lg bg-primary text-white">
+<span class="material-symbols-outlined text-xl">auto_awesome</span>
+</div>
+<h2 class="text-slate-900 dark:text-white text-lg font-bold tracking-tight">AI Studio</h2>
+</div>
+<nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
+<button class="flex items-center gap-2 px-4 py-1.5 rounded-md bg-white dark:bg-slate-700 shadow-sm text-primary text-sm font-semibold">
+<span class="material-symbols-outlined text-sm">visibility</span>
+                        Preview
+                    </button>
+<button class="flex items-center gap-2 px-4 py-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-medium transition-colors">
+<span class="material-symbols-outlined text-sm">code</span>
+                        Code
+                    </button>
+<button class="flex items-center gap-2 px-4 py-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-medium transition-colors">
+<span class="material-symbols-outlined text-sm">vertical_split</span>
+                        Split
+                    </button>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
+<button class="p-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-primary transition-all">
+<span class="material-symbols-outlined">desktop_windows</span>
+</button>
+<button class="p-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-primary transition-all">
+<span class="material-symbols-outlined">tablet_mac</span>
+</button>
+<button class="p-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-primary transition-all">
+<span class="material-symbols-outlined">smartphone</span>
+</button>
+</div>
+<div class="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2"></div>
+<button class="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all">
+<span class="material-symbols-outlined text-sm">cloud_upload</span>
+                    Publish
+                </button>
+<div class="size-8 rounded-full bg-slate-300 dark:bg-slate-700 overflow-hidden border border-slate-200 dark:border-slate-800">
+<img alt="User" data-alt="User profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdiH_VgfQo8tCHwDCMDKi2-wna0b1-ZT7AznC1H1xlxePZPzyDFrQbbwRWlYlJDAV6EeEPg25X5REK0Xa0MGx-9bAEZq-wZeDc7-8FKhxpQqbGZ4MPhhGhPFe0-Chgh_80PMgYYQYs7wIZAUBQT4hMdpFjOgM7E69HYeiFfcCMlr8cPOREtapxO1EwGZ0zziwr3jCvgtrt-A9eDfqBtow1dtLLmZDWVNhjr4-bbwSRJh3MfTw6ez-sh4amiBxJOT5oBUVPzhGDd7A"/>
+</div>
+</div>
+</header>
+<!-- Main Workspace Area -->
+<main class="flex-1 flex flex-col bg-slate-50 dark:bg-[#0c0e1a] p-4 md:p-6 overflow-hidden">
+<!-- Browser Frame -->
+<div class="flex-1 flex flex-col w-full max-w-7xl mx-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark shadow-2xl overflow-hidden">
+<!-- Browser Toolbar -->
+<div class="flex items-center gap-4 border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50">
+<div class="flex items-center gap-2 pr-2">
+<div class="size-3 rounded-full bg-red-400"></div>
+<div class="size-3 rounded-full bg-amber-400"></div>
+<div class="size-3 rounded-full bg-emerald-400"></div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+</button>
+<button class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+<button class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-lg">refresh</span>
+</button>
+</div>
+<div class="flex-1 flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 gap-2 group focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+<span class="material-symbols-outlined text-slate-400 text-sm">lock</span>
+<input class="bg-transparent border-none focus:ring-0 p-0 text-sm text-slate-600 dark:text-slate-300 w-full" readonly="" type="text" value="https://preview.ai-studio.io/landing-page-hero"/>
+<span class="material-symbols-outlined text-slate-400 text-sm cursor-pointer hover:text-primary">star</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+<span class="material-symbols-outlined">extension</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Webpage Content Rendering Area (Mock Iframe) -->
+<div class="flex-1 overflow-y-auto bg-white dark:bg-background-dark">
+<!-- Landing Page Content -->
+<div class="w-full">
+<!-- Hero Section -->
+<section class="relative min-h-[600px] flex items-center justify-center px-6 py-20 @container">
+<div class="absolute inset-0 z-0 opacity-20 dark:opacity-30">
+<div class="absolute top-[-10%] left-[-10%] size-96 rounded-full bg-primary blur-[120px]"></div>
+<div class="absolute bottom-[-10%] right-[-10%] size-96 rounded-full bg-blue-400 blur-[120px]"></div>
+</div>
+<div class="relative z-10 max-w-5xl w-full grid @[800px]:grid-cols-2 gap-12 items-center">
+<div class="flex flex-col gap-6">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider w-fit">
+<span class="material-symbols-outlined text-xs">auto_fix_high</span>
+                                        Powered by AI
+                                    </div>
+<h1 class="text-slate-900 dark:text-white text-5xl @[800px]:text-6xl font-black leading-[1.1] tracking-tight">
+                                        Ship your ideas <span class="text-primary">faster</span> than ever.
+                                    </h1>
+<p class="text-slate-600 dark:text-slate-400 text-lg leading-relaxed max-w-md">
+                                        Experience the future of interface development. Real-time live previews, instant clean code, and AI-driven components.
+                                    </p>
+<div class="flex flex-wrap gap-4 mt-4">
+<button class="px-8 py-4 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+                                            Start Building Now
+                                        </button>
+<button class="px-8 py-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                                            Learn More
+                                        </button>
+</div>
+<div class="flex items-center gap-4 mt-4">
+<div class="flex -space-x-3">
+<div class="size-10 rounded-full border-2 border-white dark:border-background-dark bg-slate-200">
+<img alt="User" class="rounded-full" data-alt="User avatar 1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCyqRVre2kKH72ZbUlTPLcOmXDkHHRHwkY-O84zIBeYx0_lMU1_0KxwO5XRUgfTOJRftc6L4Z0iRkNzxHrU6UOwfC0EUzyDy1IFHABjG4bcsAbNbP8bOXJx7M_0LrX_icbGS0S4SkuWF6bDkPW_0MuKlT-tm7U40rRkpKs57bwwc74GRoCMIOzVvIfzuKDNpywEs3iQIoaC2TAx7pAIopA_5M3ogzlKDKMBloMDWyRlKO7z3jMWRLnODAW1KRbGVkrojEDM6GGGVs"/>
+</div>
+<div class="size-10 rounded-full border-2 border-white dark:border-background-dark bg-slate-200">
+<img alt="User" class="rounded-full" data-alt="User avatar 2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0tV6d82ec0xuDlSUcbqZLzCL5OPjeqi68zfYvr44IHmH3kyJzUUDxCvYmo3VuXb-TfL-l6KrJKChHSzMNhnkYvA-7i6q8KIIbPubN43NQ3ZpuTSgC8EZRo22k6b_QYDXlAlnsi8Xmlunbj7erzqVS19T2-54HLO842sh1vu82eW4WlZWYtIdQ9UTSNPcdYtcjlNWTXtC_SL1fc3ih2dQk0bKS2jyfr8LJZFjYIqLDMgLNfKLFIS6fqFDzxtI3yt9kl0w2P-Thc8A"/>
+</div>
+<div class="size-10 rounded-full border-2 border-white dark:border-background-dark bg-slate-200">
+<img alt="User" class="rounded-full" data-alt="User avatar 3" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBasgZ2S2r1zocWaNoYXinLv0wmKS2zffxfE-JJjQCRSKZlpxnz6QdJeEkPLaLbXnTQ-vKimJNDg5tqL-Gq2f5ZkAXf3y4Z20mM6RIAa7kn9p-h-tu8SkLVOkuRbv1sqsPwDVzIAyHHPLH1R7pOeJCH0IogEh-0yQew-Ehl1zFRSqw5ar6MP5bEUEPXyT7XZhqONGoJoyxnSE8eB1TKG4Qbb4ii1Tbq37dPOZ0vBL6sU7jyEt9voeT_BnNQyyQlfW3CUItrhMUiCHA"/>
+</div>
+</div>
+<p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Joined by <span class="text-slate-900 dark:text-white font-bold">2,400+</span> creators</p>
+</div>
+</div>
+<div class="relative">
+<div class="aspect-square rounded-3xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 overflow-hidden shadow-2xl relative">
+<img alt="Hero Illustration" class="w-full h-full object-cover" data-alt="Abstract tech background with retro vibes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6vmoyhfYKIkdYWC1xwEIpKqsovkmF9FB59592RdndcwKqnhUUBQwkfVZD6ajNzcWwqJoZN_m--A58pylzNDsVk5eYXKvqJyRB8D_x-RBEOWPMSRuGMpc76IG3Xww7LA-WP7iIYpDBUSEHdHjBZl4pCybHVVZ73uSeqTclV7ljbvAskbxQINNWu5vBs2ZFtDYGM6bBHoiEkbzJiyGcO635qM1CTDZp1hVYRlFvL7eo0aCB8Hf3f4EmK7tchRgux1hbN1Eg2toRxdc"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background-dark/80 via-transparent to-transparent"></div>
+<!-- Floating UI Element 1 -->
+<div class="absolute top-8 left-8 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl hidden @[400px]:block">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+<span class="material-symbols-outlined">trending_up</span>
+</div>
+<div>
+<p class="text-xs text-white/60 font-medium">Performance</p>
+<p class="text-lg text-white font-bold">99.8%</p>
+</div>
+</div>
+</div>
+<!-- Floating UI Element 2 -->
+<div class="absolute bottom-8 right-8 bg-primary p-5 rounded-2xl shadow-xl shadow-primary/40 hidden @[400px]:block">
+<div class="flex items-center gap-3">
+<div class="p-2 bg-white/20 rounded-lg text-white">
+<span class="material-symbols-outlined">done_all</span>
+</div>
+<p class="text-sm text-white font-bold">Ready to Launch</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Section -->
+<section class="py-20 px-6 border-t border-slate-100 dark:border-slate-800">
+<div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="p-6 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary text-3xl mb-4">bolt</span>
+<h3 class="text-lg font-bold mb-2">Instant Speed</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">Generate fully functional code in milliseconds, not hours.</p>
+</div>
+<div class="p-6 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary text-3xl mb-4">shield</span>
+<h3 class="text-lg font-bold mb-2">Secure by Default</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">Enterprise grade security for all your generated assets.</p>
+</div>
+<div class="p-6 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary text-3xl mb-4">devices</span>
+<h3 class="text-lg font-bold mb-2">Responsive</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">One-click previews for any device size or orientation.</p>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- Status Bar -->
+<div class="flex items-center justify-between px-4 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-[10px] uppercase font-bold tracking-widest text-slate-400">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<div class="size-1.5 rounded-full bg-emerald-500"></div>
+<span>Live Preview Active</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[12px]">timer</span>
+<span>Latency: 24ms</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span>React v18.2.0</span>
+<span>Tailwind v3.4</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
