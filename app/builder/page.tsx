@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
@@ -55,7 +55,6 @@ interface ApiFolder {
 
 export default function BuilderPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
     const { data: session } = useSession();
 
     const {
@@ -81,11 +80,19 @@ export default function BuilderPage() {
     const [workspaceView, setWorkspaceView] = useState<"preview" | "code">("preview");
     const [isVersionPanelOpen, setIsVersionPanelOpen] = useState(false);
     const [projectLimitMessage, setProjectLimitMessage] = useState("");
+    const [activeProjectIdFromQuery, setActiveProjectIdFromQuery] = useState("");
 
-    const activeProjectIdFromQuery = useMemo(
-        () => searchParams.get("projectId") || searchParams.get("id") || "",
-        [searchParams],
-    );
+    useEffect(() => {
+        const syncProjectIdFromUrl = () => {
+            const params = new URLSearchParams(window.location.search);
+            setActiveProjectIdFromQuery(params.get("projectId") || params.get("id") || "");
+        };
+
+        syncProjectIdFromUrl();
+        window.addEventListener("popstate", syncProjectIdFromUrl);
+
+        return () => window.removeEventListener("popstate", syncProjectIdFromUrl);
+    }, []);
 
     const loadProjects = useCallback(
         async (query = "") => {
@@ -172,6 +179,7 @@ export default function BuilderPage() {
 
             if (pushUrl) {
                 router.push(`/builder?projectId=${nextProjectId}`);
+                setActiveProjectIdFromQuery(nextProjectId);
             }
         },
         [resetProjectState, setProjectId, setProjectName, setMessages, setFiles, updatePreview, router],
@@ -205,6 +213,7 @@ export default function BuilderPage() {
         updatePreview("");
 
         router.push(`/builder?projectId=${created._id}`);
+        setActiveProjectIdFromQuery(String(created._id));
 
         await loadProjects(searchValue);
     }, [resetProjectState, setProjectId, setProjectName, setMessages, setFiles, updatePreview, router, loadProjects, searchValue]);
@@ -302,6 +311,7 @@ export default function BuilderPage() {
             setProjectId("");
             setProjectName("New Project");
             router.push("/builder");
+            setActiveProjectIdFromQuery("");
         }
     };
 
