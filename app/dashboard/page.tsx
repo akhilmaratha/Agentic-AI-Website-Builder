@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { FolderKanban, Plus, Eye, Edit2, Crown, Zap } from "lucide-react";
