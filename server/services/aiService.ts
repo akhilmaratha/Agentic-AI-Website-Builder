@@ -10,7 +10,7 @@ export class AIService {
   private model: string;
 
   constructor() {
-    this.apiKey = process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
+    this.apiKey = process.env.OPENROUTER_API_KEY ?? "";
     this.baseURL = process.env.AI_BASE_URL ?? "https://openrouter.ai/api/v1";
     this.model = process.env.AI_MODEL ?? "deepseek/deepseek-chat";
   }

@@ -53,7 +53,7 @@ function parseAIJsonResponse(raw: string): ChatResponse {
 
 function getAIConfig() {
   return {
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "",
+    apiKey: process.env.OPENROUTER_API_KEY ||  "",
     baseURL: process.env.AI_BASE_URL || "https://openrouter.ai/api/v1",
     model: process.env.AI_MODEL || "deepseek/deepseek-chat",
   };
