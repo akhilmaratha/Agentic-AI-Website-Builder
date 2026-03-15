@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import connectToDatabase from "@/lib/mongoose";
+import { extractClientIp, getPlanRequestLimit, incrementRateLimit } from "@/lib/rateLimit";
+import { systemPrompt } from "@/ai-engine/prompts/system/systemPrompt";
 import { ChatMessage, checkAndIncrementGeneration, FileModel, Project, User, Version } from "@/server/models";
+import { buildExpandedCreationPrompt, shouldExpandPrompt } from "@/server/services/promptExpansion";
 
 // ─────────────────────────────────────────────
 // Types
@@ -28,52 +31,109 @@ interface ChatResponse {
   code?: string;
 }
 
+function parseAIJsonResponse(raw: string): ChatResponse {
+  const stripped = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+
+  try {
+    return JSON.parse(stripped) as ChatResponse;
+  } catch {
+    // Some models prepend/append text around JSON. Extract the largest JSON block.
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      const candidate = stripped.slice(start, end + 1);
+      return JSON.parse(candidate) as ChatResponse;
+    }
+    throw new Error("Could not parse AI response as JSON");
+  }
+}
+
+function getAIConfig() {
+  return {
+    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "",
+    baseURL: process.env.AI_BASE_URL || "https://openrouter.ai/api/v1",
+    model: process.env.AI_MODEL || "deepseek/deepseek-chat",
+  };
+}
+
+function getModelCandidates(model: string, baseURL: string): string[] {
+  const candidates = [model];
+  if (baseURL.includes("openrouter.ai")) {
+    candidates.push("deepseek/deepseek-chat");
+    candidates.push("deepseek/deepseek-r1");
+  }
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+function getAIHeaders(apiKey: string, baseURL: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  if (baseURL.includes("openrouter.ai")) {
+    headers["HTTP-Referer"] = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    headers["X-Title"] = "Agentic AI Website Builder";
+  }
+
+  return headers;
+}
+
 // ─────────────────────────────────────────────
 // System prompt
 // ─────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are an expert Next.js developer working inside an AI website builder.
-
-ENABLE SAFE EDITING MODE:
-1. NEVER delete the existing UI unless explicitly instructed.
-2. NEVER regenerate the entire page. Only modify the required sections of the code.
-3. Always preserve existing components. Append new sections instead of replacing them.
-4. Add new UI sections as separate reusable components in the \`components/\` directory.
-5. Identify the main page layout and insert your new component without removing existing layout code.
-6. Return incremental code changes. If adding a 'Testimonials' section to a page that has <Hero /> and <Features />, your updated page must include <Hero />, <Features />, AND <Testimonials />. Do not overwrite the layout.
-
-STRICT RULES:
-- Use functional React components with TypeScript
-- Use Tailwind CSS for all styling (dark theme preferred: slate-900 bg, blue-600 accent)
-- Keep components modular and reusable (e.g., \`components/Hero.tsx\`, \`components/Pricing.tsx\`)
-- Make layouts fully responsive
-- Use modern UI patterns (glassmorphism, gradients, smooth transitions)
-- Export components as default exports
-- IMPORTANT: For ALL images, use Unsplash source URLs. NEVER leave empty image placeholders.
-  - Hero images: https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&h=900&fit=crop
-  - Person/avatar: https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop
-  - Technology: https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=600&fit=crop
-  - Startup/office: https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=600&fit=crop
-  - All images must include: width, height attrs, className="w-full h-auto object-cover rounded-lg"
-
-OUTPUT FORMAT (strict JSON — no markdown fences, raw JSON only):
-{
-  "type": "code_update",
-  "operation": "insert_section",
-  "reply": "A short friendly explanation of what you built",
-  "files": {
-    "src/components/NewComponent.tsx": "// full component code here",
-    "src/pages/index.tsx": "// incremented page layout preserving all previous components"
-  },
-  "preview": "<!DOCTYPE html><html>...</html>"
-}
-
-The "preview" field must be a self-contained HTML string with Tailwind CDN that renders the generated UI visually.
-If the user asks a question (no code needed), return type "message_only" with just a "reply" field.`;
+const SYSTEM_PROMPT = systemPrompt;
 
 // ─────────────────────────────────────────────
 // Preview HTML wrapper
+// Accepts either:
+//   (a) a complete HTML string (returned as-is), or
+//   (b) React/TSX source code (compiled in the iframe via Babel standalone)
 // ─────────────────────────────────────────────
-function buildPreviewHTML(title = "Preview", bodyHTML = ""): string {
+function buildPreviewHTML(title = "Preview", source = ""): string {
+  // If no source, return a minimal loading placeholder
+  if (!source.trim()) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-[#0a0b14] text-white flex items-center justify-center h-screen">
+<p class="text-slate-500 text-sm">Send a message to generate a preview.</p>
+</body></html>`;
+  }
+
+  // If it looks like a complete HTML doc, return it directly
+  if (source.trimStart().startsWith("<!DOCTYPE") || source.trimStart().startsWith("<html")) {
+    return source;
+  }
+
+  // Otherwise treat it as React/TSX — compile in the browser via Babel standalone
+  // Strip TypeScript-only constructs that Babel standalone doesn't understand
+  const babelCode = source
+    // Remove import lines (React, hooks, lucide-react etc. — they'll be global)
+    .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
+    // Remove "use client" directive
+    .replace(/^['"]use client['"];?\s*$/gm, "")
+    // Remove interface / type declarations
+    .replace(/^(export\s+)?(interface|type)\s+\w+[\s\S]*?^}/gm, "")
+    // Remove TypeScript generics from useState<X>  →  useState
+    .replace(/\buseState<[^>]+>/g, "useState")
+    // Remove : TypeAnnotation from function params (basic patterns)
+    .replace(/:\s*(string|number|boolean|void|never|any|unknown|React\.FC[^,)]*)([\s,)=])/g, "$2")
+    // Remove export default — we'll render the component manually
+    .replace(/^export\s+default\s+function\s+/gm, "function ")
+    .replace(/^export\s+default\s+/gm, "")
+    // Remove named exports
+    .replace(/^export\s+\{[^}]*\};?\s*$/gm, "")
+    .trim();
+
+  // Find the last top-level function/const component name to render
+  const funcMatches = [...babelCode.matchAll(/^(?:function|const)\s+([A-Z][A-Za-z0-9_]*)/gm)];
+  const componentName = funcMatches.length > 0
+    ? funcMatches[funcMatches.length - 1][1]
+    : "App";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -81,15 +141,27 @@ function buildPreviewHTML(title = "Preview", bodyHTML = ""): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>${title}</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { font-family: 'Space Grotesk', sans-serif; margin: 0; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-    .animate-pulse { animation: pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
+    body { margin: 0; }
+    @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .animate-pulse { animation: pulse-anim 2s cubic-bezier(.4,0,.6,1) infinite; }
   </style>
 </head>
-<body class="bg-slate-950 text-white">
-  ${bodyHTML || `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#64748b;font-size:1rem;">Preview rendered in iframe</div>`}
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useCallback } = React;
+${babelCode}
+    const rootEl = document.getElementById('root');
+    if (rootEl && typeof ${componentName} !== 'undefined') {
+      ReactDOM.createRoot(rootEl).render(React.createElement(${componentName}));
+    } else {
+      rootEl.innerHTML = '<p style="color:#64748b;padding:2rem">Component not found.</p>';
+    }
+  </script>
 </body>
 </html>`;
 }
@@ -132,19 +204,13 @@ function deriveProjectNameFromPrompt(prompt: string): string {
 
 async function generateProjectName(prompt: string): Promise<string> {
   const fallback = deriveProjectNameFromPrompt(prompt);
-  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
+  const { apiKey, baseURL, model } = getAIConfig();
   if (!apiKey) return fallback;
-
-  const baseURL = process.env.AI_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.AI_MODEL || "gpt-4o-mini";
 
   try {
     const res = await fetch(`${baseURL}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: getAIHeaders(apiKey, baseURL),
       body: JSON.stringify({
         model,
         temperature: 0.2,
@@ -697,7 +763,7 @@ export default ${componentName};`;
 }
 
 // ─────────────────────────────────────────────
-// Call the real AI model (OpenAI-compatible)
+// Call the real AI model (OpenAI-compatible, including OpenRouter)
 // ─────────────────────────────────────────────
 async function callAIModel(
   messages: { role: string; content: string }[],
@@ -705,61 +771,87 @@ async function callAIModel(
   baseURL: string,
   model: string
 ): Promise<ChatResponse> {
-  // Normalize roles: store uses "ai", OpenAI requires "assistant"
+  // Normalize roles: store uses "ai", chat APIs require "assistant"
   const normalized = messages.map((m) => ({
     ...m,
     role: m.role === "ai" ? "assistant" : m.role,
   }));
 
-  const res = await fetch(`${baseURL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ 
-        role: "system", 
-        content: SYSTEM_PROMPT 
-      }, ...normalized],
-      temperature: 0.7,
-      max_tokens: 4096,
-      response_format: { type: "json_object" },
-    }),
-  });
+  let lastError: Error | null = null;
 
-  if (!res.ok) {
-    let errBody = "";
-    try { errBody = await res.text(); } catch { /* ignore */ }
-    throw new Error(`AI API ${res.status} ${res.statusText}: ${errBody}`);
+  for (const modelName of getModelCandidates(model, baseURL)) {
+    const payloads = [
+      {
+        model: modelName,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...normalized],
+        temperature: 0.7,
+        max_tokens: 8192,
+        response_format: { type: "json_object" },
+      },
+      {
+        model: modelName,
+        messages: [
+          {
+            role: "system",
+            content: `${SYSTEM_PROMPT}\n\nReturn STRICT raw JSON object only. No markdown fences.`,
+          },
+          ...normalized,
+        ],
+        temperature: 0.6,
+        max_tokens: 8192,
+      },
+    ];
+
+    for (const payload of payloads) {
+      try {
+        const res = await fetch(`${baseURL}/chat/completions`, {
+          method: "POST",
+          headers: getAIHeaders(apiKey, baseURL),
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          let errBody = "";
+          try { errBody = await res.text(); } catch { /* ignore */ }
+          throw new Error(`AI API ${res.status} ${res.statusText}: ${errBody}`);
+        }
+
+        const data = await res.json();
+        const raw: string = data?.choices?.[0]?.message?.content ?? "";
+        if (!raw) throw new Error("AI returned empty content");
+
+        const parsed = parseAIJsonResponse(raw);
+
+        // Build preview from the generated code if AI didn't provide one
+        if (!parsed.preview || parsed.preview.trim().length < 50) {
+          // Prefer the main page file; fall back to `code` field or first file
+          const mainFile =
+            parsed.files?.["src/app/page.tsx"] ??
+            parsed.files?.["src/pages/index.tsx"] ??
+            parsed.code ??
+            (parsed.files ? Object.values(parsed.files)[0] : "") ??
+            "";
+          parsed.preview = buildPreviewHTML("AI Preview", mainFile);
+        }
+        if (!parsed.type) parsed.type = "code_update";
+        // Ensure code field is always populated for the editor
+        if (!parsed.code && parsed.files) {
+          parsed.code =
+            parsed.files["src/app/page.tsx"] ??
+            parsed.files["src/pages/index.tsx"] ??
+            Object.values(parsed.files)[0] ??
+            "";
+        }
+        return parsed;
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error("Unknown AI error");
+        lastError = err;
+        console.error(`[chat] AI call attempt failed (model=${modelName}):`, err.message);
+      }
+    }
   }
 
-  const data = await res.json();
-  const raw: string = data?.choices?.[0]?.message?.content ?? "";
-  if (!raw) throw new Error("AI returned empty content");
-
-  // Strip markdown code fences some models wrap around JSON
-  const stripped = raw
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/, "")
-    .trim();
-
-  let parsed: ChatResponse;
-  try {
-    parsed = JSON.parse(stripped);
-  } catch {
-    console.error("[chat] JSON parse failed. Raw:", raw.slice(0, 400));
-    throw new Error("Could not parse AI response as JSON");
-  }
-
-  // Ensure preview is present
-  if (!parsed.preview && parsed.files) {
-    parsed.preview = buildPreviewHTML("AI Preview");
-  }
-  if (!parsed.type) parsed.type = "code_update";
-
-  return parsed;
+  throw lastError || new Error("AI provider call failed");
 }
 
 // ─────────────────────────────────────────────
@@ -768,6 +860,24 @@ async function callAIModel(
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    const plan =
+      ((session?.user as Record<string, unknown> | undefined)?.plan as string | undefined) || "free";
+    const userId =
+      session?.user?.email || req.headers.get("x-user-id") || extractClientIp(req.headers.get("x-forwarded-for"));
+
+    const requestLimit = getPlanRequestLimit(plan, 10, 50);
+    const requestRate = await incrementRateLimit({
+      key: `rate_limit:${userId}`,
+      limit: requestLimit,
+      windowSeconds: 60,
+    });
+    if (!requestRate.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait before sending more requests." },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as ChatRequestBody;
     const userMessage = body.message || body.prompt || "";
     const projectId = body.projectId;
@@ -789,6 +899,14 @@ export async function POST(req: NextRequest) {
       if (userMessage.trim()) conversationMessages.push({ role: "user", content: userMessage });
     }
 
+    // Expand first-time website creation prompts with richer design/build requirements.
+    if (shouldExpandPrompt(conversationMessages)) {
+      const latest = conversationMessages[conversationMessages.length - 1];
+      if (latest && latest.role === "user" && latest.content.trim()) {
+        latest.content = buildExpandedCreationPrompt(latest.content);
+      }
+    }
+
     // Append project context to final user message
     if (body.projectContext && conversationMessages.length > 0) {
       const ctx = body.projectContext;
@@ -807,7 +925,7 @@ export async function POST(req: NextRequest) {
       if (!genCheck.allowed) {
         return NextResponse.json({
           type: "message_only",
-          reply: "⚠️ **Daily generation limit reached!**\n\nYou've used all 5 free AI generations for today. Upgrade to Pro for unlimited generations.\n\n[Upgrade to Pro →](/pricing)",
+          reply: "You have reached the daily limit of 5 generations. Upgrade to Pro for unlimited usage.",
           limitReached: true,
           remaining: 0,
           plan: genCheck.plan,
@@ -816,9 +934,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Try real AI ──────────────────────────────────────────
-    const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
-    const baseURL = process.env.AI_BASE_URL || "https://api.openai.com/v1";
-    const model   = process.env.AI_MODEL      || "gpt-4o-mini";
+    const { apiKey, baseURL, model } = getAIConfig();
 
     let result: ChatResponse;
 
@@ -828,11 +944,29 @@ export async function POST(req: NextRequest) {
         result = await callAIModel(conversationMessages, apiKey, baseURL, model);
         console.log(`[chat] ✓ type=${result.type} files=${Object.keys(result.files ?? {}).join(", ")}`);
       } catch (aiErr) {
-        console.error("[chat] AI failed, using local fallback:", aiErr instanceof Error ? aiErr.message : aiErr);
-        result = localGenerate(conversationMessages[conversationMessages.length - 1]?.content ?? userMessage);
+        const reason = aiErr instanceof Error ? aiErr.message : "Unknown provider error";
+        const useLocalFallback = process.env.AI_ENABLE_LOCAL_FALLBACK === "true";
+        if (useLocalFallback) {
+          console.error("[chat] AI failed, using local fallback:", reason);
+          result = localGenerate(conversationMessages[conversationMessages.length - 1]?.content ?? userMessage);
+        } else {
+          return NextResponse.json(
+            {
+              type: "message_only",
+              reply: `AI provider failed: ${reason}. Please check your OpenRouter model/key/credits and try again.`,
+            },
+            { status: 502 }
+          );
+        }
       }
     } else {
-      result = localGenerate(conversationMessages[conversationMessages.length - 1]?.content ?? userMessage);
+      return NextResponse.json(
+        {
+          type: "message_only",
+          reply: "AI provider key is missing. Set OPENROUTER_API_KEY and try again.",
+        },
+        { status: 500 }
+      );
     }
 
     // Save chat history and generated state to DB if user is logged in

@@ -10,9 +10,9 @@ export class AIService {
   private model: string;
 
   constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY ?? "";
-    this.baseURL = process.env.AI_BASE_URL ?? "https://api.openai.com/v1";
-    this.model = process.env.AI_MODEL ?? "gpt-4o-mini";
+    this.apiKey = process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
+    this.baseURL = process.env.AI_BASE_URL ?? "https://openrouter.ai/api/v1";
+    this.model = process.env.AI_MODEL ?? "deepseek/deepseek-chat";
   }
 
   /**
@@ -32,12 +32,19 @@ export class AIService {
     if (!this.apiKey) return code; // no-op if no key
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      };
+
+      if (this.baseURL.includes("openrouter.ai")) {
+        headers["HTTP-Referer"] = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+        headers["X-Title"] = "Agentic AI Website Builder";
+      }
+
       const res = await fetch(`${this.baseURL}/chat/completions`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: this.model,
           messages: [

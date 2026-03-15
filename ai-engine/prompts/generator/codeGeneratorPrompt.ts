@@ -1,0 +1,14 @@
+export const codeGeneratorPrompt = `Code quality requirements for all generated files:
+- Use Next.js App Router + TypeScript + Tailwind CSS
+- Every component must be a named React functional component with explicit TypeScript types
+- Responsive layout: use grid/flex with sm/md/lg breakpoints
+- Modern SaaS visual language: dark backgrounds, blue (#2547f4 or blue-600) accents
+- Cards: rounded-xl, border border-slate-800, bg-slate-900/40, hover transitions
+- Shadows: shadow-lg or shadow-xl on key elements
+- Gradients: use linear-gradient or Tailwind gradient utilities for headings
+- Spacing: generous padding (py-20 to py-32 for sections, px-8 for containers)
+- Typography: text-5xl or text-6xl for hero headings, text-xl for sub-headings, text-slate-400 for body
+- All images: use Unsplash placeholder URLs
+- No external UI library imports (Tailwind only)
+- Each component goes in its own file under src/components/
+- The main entry file must be src/pages/index.tsx or src/app/page.tsx`;

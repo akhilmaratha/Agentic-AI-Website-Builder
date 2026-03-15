@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import connectToDatabase from "@/lib/mongoose";
+import { extractClientIp, getPlanRequestLimit, incrementRateLimit } from "@/lib/rateLimit";
 import { FileModel, Project, User } from "@/server/models";
 
 export async function GET(req: NextRequest) {
@@ -69,6 +70,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const plan =
+      ((session.user as Record<string, unknown> | undefined)?.plan as string | undefined) || "free";
+    const userId =
+      session.user.email || req.headers.get("x-user-id") || extractClientIp(req.headers.get("x-forwarded-for"));
+
+    const requestLimit = getPlanRequestLimit(plan, 10, 50);
+    const requestRate = await incrementRateLimit({
+      key: `rate_limit:${userId}`,
+      limit: requestLimit,
+      windowSeconds: 60,
+    });
+    if (!requestRate.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait before sending more requests." },
+        { status: 429 }
+      );
+    }
+
     await connectToDatabase();
 
     const user = await User.findOne({ email: session.user.email });
@@ -78,6 +97,16 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const existingCount = await Project.countDocuments({ userId: user._id, status: "active" });
+    if ((plan === "free" || !plan) && existingCount >= 10) {
+      return NextResponse.json(
+        {
+          error: "You have reached the maximum number of projects for the free plan.",
+          projectLimitReached: true,
+        },
+        { status: 403 }
+      );
+    }
+
     const defaultName = `Project ${existingCount + 1}`;
     const project = await Project.create({
       userId: user._id,

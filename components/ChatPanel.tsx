@@ -8,14 +8,19 @@ import {
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { PROMPT_MAP } from "@/ai-engine/promptMap";
 
 const SUGGESTION_CHIPS = [
-  "Add a testimonials section",
-  "Make the hero more vibrant",
-  "Add a pricing section",
-  "Create a contact form",
-  "Add a sticky navbar",
+  "Create portfolio website",
+  "Create SaaS landing page",
+  "Generate blog homepage",
+  "Create ecommerce store UI",
+  "Build agency website",
 ];
+
+function expandSuggestionPrompt(chip: string): string {
+  return PROMPT_MAP[chip] || chip;
+}
 
 export default function ChatPanel({ isFloating = false }: { isFloating?: boolean }) {
   const {
@@ -62,9 +67,10 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
     }
   }, [input]);
 
-  const sendMessage = async (text?: string) => {
+  const sendMessage = async (text?: string, displayText?: string) => {
     const msg = (text ?? input).trim();
     if (!msg || isGenerating) return;
+    const visibleMsg = (displayText ?? msg).trim();
 
     if (limitReached) {
       setShowUpgradeModal(true);
@@ -74,11 +80,11 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
     setInput("");
     setIsGenerating(true);
 
-    addMessage({ role: "user", content: msg });
+    addMessage({ role: "user", content: visibleMsg });
     addMessage({ role: "ai", content: "", isStreaming: true });
 
     const ts = new Date().toLocaleTimeString();
-    addLog(`[${ts}] User: ${msg.slice(0, 60)}`);
+    addLog(`[${ts}] User: ${visibleMsg.slice(0, 60)}`);
 
     try {
       const res = await fetch("/api/chat", {
@@ -87,7 +93,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
         body: JSON.stringify({
           message: msg,
           projectId,
-          messages: messages.concat({ id: "", role: "user", content: msg, timestamp: Date.now() })
+          messages: messages.concat({ id: "", role: "user", content: visibleMsg, timestamp: Date.now() })
             .map((m) => ({ role: m.role === "ai" ? "assistant" : "user", content: m.content })),
           projectContext: {
             currentFile: activeFile,
@@ -153,7 +159,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
             </span>
           )}
           <span className="px-2 py-0.5 rounded text-[10px] bg-[#2547f4]/20 text-[#2547f4] font-bold tracking-wide">
-            GPT-4o
+            DeepSeek Chat
           </span>
         </div>
       </div>
@@ -276,19 +282,34 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
 
       {/* Bottom area */}
       <div className="p-4 space-y-3 border-t border-[#222949] bg-[#0a0b14]">
+        <div className="rounded-xl border border-[#222949] bg-[#12172e] px-3 py-2">
+          {isPro ? (
+            <>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">AI Generations</p>
+              <p className="text-sm font-bold text-emerald-400">Unlimited</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">AI Generations Today</p>
+              <p className="text-sm font-bold text-slate-200">{genStatus.used} / {genStatus.limit}</p>
+              <p className="text-[11px] text-slate-500">{genStatus.used} / {genStatus.limit} generations used today.</p>
+            </>
+          )}
+        </div>
+
         {/* Limit reached warning */}
         {limitReached && (
           <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl">
             <Crown className="w-5 h-5 text-red-400 shrink-0" />
             <div className="flex-1">
-              <p className="text-xs font-bold text-red-400">Daily limit reached</p>
+              <p className="text-xs font-bold text-red-400">You have reached today's generation limit.</p>
               <p className="text-[10px] text-slate-400">Upgrade to Pro for unlimited AI generations.</p>
             </div>
             <Link
               href="/pricing"
               className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white text-[10px] font-bold rounded-lg transition-all shrink-0"
             >
-              Upgrade
+              Upgrade to Pro
             </Link>
           </div>
         )}
@@ -316,7 +337,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
           {SUGGESTION_CHIPS.map((chip) => (
             <button
               key={chip}
-              onClick={() => sendMessage(chip)}
+              onClick={() => sendMessage(expandSuggestionPrompt(chip), chip)}
               disabled={isGenerating || limitReached}
               className="whitespace-nowrap px-3 py-1.5 bg-slate-800/50 hover:bg-[#2547f4]/20 hover:border-[#2547f4]/50 border border-[#222949] rounded-full text-[11px] font-medium text-slate-400 hover:text-[#2547f4] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -345,7 +366,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
             id="chat-send-btn"
             onClick={() => sendMessage()}
             disabled={isGenerating || !input.trim() || limitReached}
-            title={limitReached ? "Daily generation limit reached. Upgrade to Pro." : "Send message"}
+            title={limitReached ? "You have reached today's generation limit." : "Generate"}
             className={`absolute bottom-3 right-3 p-1.5 rounded-lg text-white transition-all ${
               limitReached
                 ? "bg-slate-700 opacity-40 cursor-not-allowed"
@@ -356,11 +377,19 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
           </button>
         </div>
 
+        {/* <button
+          onClick={() => sendMessage()}
+          disabled={isGenerating || !input.trim() || limitReached}
+          className="w-full py-2 rounded-lg bg-[#2547f4] hover:bg-blue-600 disabled:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold text-white"
+        >
+          Generate
+        </button> */}
+
         {/* Footer line */}
         <div className="flex items-center justify-between px-1">
-          <button className="text-[11px] font-bold text-slate-400 flex items-center gap-1 hover:text-slate-200 transition-colors">
+          {/* <button className="text-[11px] font-bold text-slate-400 flex items-center gap-1 hover:text-slate-200 transition-colors">
             <PlusCircle className="w-3.5 h-3.5" /> Add Section
-          </button>
+          </button> */}
           <span className="text-[10px] text-slate-600">⌘ + Enter to send</span>
         </div>
       </div>
@@ -381,7 +410,7 @@ export default function ChatPanel({ isFloating = false }: { isFloating?: boolean
                 <Crown className="w-8 h-8 text-purple-400" />
               </div>
               <h3 className="text-2xl font-bold mb-2">Upgrade to Pro</h3>
-              <p className="text-slate-400">You've used all 5 free AI generations today.</p>
+              <p className="text-slate-400">You have reached today's generation limit.</p>
             </div>
 
             <ul className="space-y-3 mb-8">

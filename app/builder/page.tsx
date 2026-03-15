@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import {
     Zap,
     Download,
@@ -26,7 +27,8 @@ import PreviewPanel from "@/components/PreviewPanel";
 import CodePanel from "@/components/CodePanel";
 import FileExplorer from "@/components/FileExplorer";
 import TerminalPanel from "@/components/TerminalPanel";
-import BuilderSidebar, { SidebarProject } from "@/components/BuilderSidebar";
+import BuilderSidebar, { SidebarFolder, SidebarProject } from "../../components/BuilderSidebar";
+import VersionHistoryPanel from "../../components/VersionHistoryPanel";
 
 interface ApiMessage {
     _id?: string;
@@ -40,8 +42,15 @@ interface ApiMessage {
 interface ApiProject {
     _id: string;
     name: string;
+    folderId?: string | null;
     updatedAt?: string;
     previewHTML?: string;
+}
+
+interface ApiFolder {
+    _id: string;
+    name: string;
+    isCollapsed?: boolean;
 }
 
 export default function BuilderPage() {
@@ -65,10 +74,13 @@ export default function BuilderPage() {
     } = useBuilderStore();
 
     const [projects, setProjects] = useState<SidebarProject[]>([]);
+    const [folders, setFolders] = useState<SidebarFolder[]>([]);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(true);
     const [searchValue, setSearchValue] = useState("");
     const [workspaceView, setWorkspaceView] = useState<"preview" | "code">("preview");
+    const [isVersionPanelOpen, setIsVersionPanelOpen] = useState(false);
+    const [projectLimitMessage, setProjectLimitMessage] = useState("");
 
     const activeProjectIdFromQuery = useMemo(
         () => searchParams.get("projectId") || searchParams.get("id") || "",
@@ -87,6 +99,7 @@ export default function BuilderPage() {
                     .map((p: ApiProject) => ({
                         _id: String(p._id),
                         name: p.name || "New Project",
+                        folderId: p.folderId || null,
                         updatedAt: p.updatedAt,
                     }))
                     .sort((a: SidebarProject, b: SidebarProject) => {
@@ -105,6 +118,20 @@ export default function BuilderPage() {
         },
         [activeProjectIdFromQuery, projectId],
     );
+
+    const loadFolders = useCallback(async () => {
+        const res = await fetch("/api/folders");
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: SidebarFolder[] = Array.isArray(data.folders)
+            ? (data.folders as ApiFolder[]).map((f) => ({
+                _id: String(f._id),
+                name: f.name,
+                isCollapsed: !!f.isCollapsed,
+            }))
+            : [];
+        setFolders(list);
+    }, []);
 
     const loadProject = useCallback(
         async (nextProjectId: string, pushUrl: boolean) => {
@@ -151,13 +178,20 @@ export default function BuilderPage() {
     );
 
     const createNewProject = useCallback(async () => {
+        setProjectLimitMessage("");
         const res = await fetch("/api/projects", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({}),
         });
 
-        if (!res.ok) return;
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data?.projectLimitReached) {
+                setProjectLimitMessage(data.error || "You have reached the maximum number of projects for the free plan.");
+            }
+            return;
+        }
         const data = await res.json();
 
         const created = data.project as ApiProject;
@@ -178,6 +212,10 @@ export default function BuilderPage() {
     useEffect(() => {
         void loadProjects(searchValue);
     }, [loadProjects, searchValue]);
+
+    useEffect(() => {
+        void loadFolders();
+    }, [loadFolders]);
 
     useEffect(() => {
         if (activeProjectIdFromQuery) {
@@ -210,6 +248,81 @@ export default function BuilderPage() {
     };
 
     const userPlan = ((session?.user as Record<string, unknown> | undefined)?.plan as "free" | "pro" | "enterprise" | undefined) || "free";
+    const projectLimitReached = userPlan === "free" && projects.length >= 10;
+
+    const handleCreateFolder = async () => {
+        await fetch("/api/folders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "New Folder" }),
+        });
+        await loadFolders();
+    };
+
+    const handleRenameFolder = async (folderId: string, name: string) => {
+        await fetch(`/api/folders/${folderId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+        });
+        await loadFolders();
+    };
+
+    const handleDeleteFolder = async (folderId: string) => {
+        await fetch(`/api/folders/${folderId}`, { method: "DELETE" });
+        await Promise.all([loadFolders(), loadProjects(searchValue)]);
+    };
+
+    const handleToggleFolderCollapse = async (folderId: string, collapsed: boolean) => {
+        setFolders((prev) => prev.map((f) => (f._id === folderId ? { ...f, isCollapsed: collapsed } : f)));
+        await fetch(`/api/folders/${folderId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isCollapsed: collapsed }),
+        });
+    };
+
+    const handleRenameProject = async (targetProjectId: string, name: string) => {
+        await fetch(`/api/projects/${targetProjectId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+        });
+        await loadProjects(searchValue);
+        if (targetProjectId === projectId) {
+            setProjectName(name);
+        }
+    };
+
+    const handleDeleteProject = async (targetProjectId: string) => {
+        await fetch(`/api/projects/${targetProjectId}`, { method: "DELETE" });
+        await loadProjects(searchValue);
+        if (targetProjectId === projectId) {
+            resetProjectState();
+            setProjectId("");
+            setProjectName("New Project");
+            router.push("/builder");
+        }
+    };
+
+    const handleDuplicateProject = async (targetProjectId: string) => {
+        const res = await fetch(`/api/projects/${targetProjectId}/duplicate`, { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json();
+        await loadProjects(searchValue);
+        if (data?.project?._id) {
+            await loadProject(String(data.project._id), true);
+        }
+    };
+
+    const handleMoveProject = async (targetProjectId: string, folderId: string | null) => {
+        await fetch(`/api/projects/${targetProjectId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ folderId }),
+        });
+        setProjects((prev) => prev.map((p) => (p._id === targetProjectId ? { ...p, folderId } : p)));
+    };
 
     return (
         <div className="h-screen flex flex-col bg-[#0a0b14] text-slate-100 overflow-hidden font-sans">
@@ -250,7 +363,11 @@ export default function BuilderPage() {
                         <Redo2 className="w-4 h-4" />
                     </button>
                     <div className="w-px h-4 bg-slate-700 mx-1" />
-                    <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Version History">
+                    <button
+                        onClick={() => setIsVersionPanelOpen(true)}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+                        title="Version History"
+                    >
                         <History className="w-4 h-4" />
                     </button>
                     <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Components">
@@ -294,9 +411,24 @@ export default function BuilderPage() {
                 </div>
             </header>
 
+            {(projectLimitMessage || projectLimitReached) && (
+                <div className="px-4 py-2 border-b border-[#3a264f] bg-[#23182f] flex items-center justify-between gap-3">
+                    <p className="text-xs text-violet-200">
+                        {projectLimitMessage || "You have reached the maximum number of projects for the free plan."}
+                    </p>
+                    <Link
+                        href="/pricing"
+                        className="px-3 py-1 rounded-md bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shrink-0"
+                    >
+                        Upgrade to Pro
+                    </Link>
+                </div>
+            )}
+
             <div className="flex flex-1 overflow-hidden relative bg-[#0a0b14]">
                 <BuilderSidebar
                     projects={projects}
+                    folders={folders}
                     activeProjectId={projectId}
                     searchValue={searchValue}
                     isCollapsed={isSidebarCollapsed}
@@ -304,8 +436,17 @@ export default function BuilderPage() {
                     userName={session?.user?.name}
                     onToggle={() => setIsSidebarCollapsed((prev) => !prev)}
                     onSearchChange={setSearchValue}
+                    disableNewProject={projectLimitReached}
                     onNewProject={() => void createNewProject()}
-                    onSelectProject={(id) => void loadProject(id, true)}
+                    onSelectProject={(id: string) => void loadProject(id, true)}
+                    onCreateFolder={() => void handleCreateFolder()}
+                    onRenameFolder={(folderId: string, name: string) => void handleRenameFolder(folderId, name)}
+                    onDeleteFolder={(folderId: string) => void handleDeleteFolder(folderId)}
+                    onToggleFolderCollapse={(folderId: string, collapsed: boolean) => void handleToggleFolderCollapse(folderId, collapsed)}
+                    onRenameProject={(targetProjectId: string, name: string) => void handleRenameProject(targetProjectId, name)}
+                    onDeleteProject={(targetProjectId: string) => void handleDeleteProject(targetProjectId)}
+                    onDuplicateProject={(targetProjectId: string) => void handleDuplicateProject(targetProjectId)}
+                    onMoveProject={(targetProjectId: string, folderId: string | null) => void handleMoveProject(targetProjectId, folderId)}
                 />
 
                 {isChatOpen && (
@@ -381,6 +522,17 @@ export default function BuilderPage() {
                     </div>
                 </div>
             </footer>
+
+            <VersionHistoryPanel
+                open={isVersionPanelOpen}
+                projectId={projectId}
+                onClose={() => setIsVersionPanelOpen(false)}
+                onRestore={(files) => {
+                    setFiles(files);
+                    updatePreview("");
+                    setWorkspaceView("code");
+                }}
+            />
         </div>
     );
 }
