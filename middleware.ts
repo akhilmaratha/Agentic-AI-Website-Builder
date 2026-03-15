@@ -10,7 +10,9 @@ export default async function middleware(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
   if (pathname.startsWith("/api")) {
-    const ip = req.ip || extractClientIp(req.headers.get("x-forwarded-for"), "unknown");
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const realIp = req.headers.get("x-real-ip");
+    const ip = extractClientIp(forwardedFor, realIp || "unknown");
     const userId =
       (typeof token?.sub === "string" && token.sub) ||
       (typeof token?.email === "string" && token.email) ||
